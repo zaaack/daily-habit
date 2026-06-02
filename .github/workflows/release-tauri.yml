@@ -157,14 +157,15 @@ jobs:
 
             for (const file of files) {
               const data = fs.readFileSync(file);
+              const newName = path.basename(file).replace(/\.apk$/, '-tauri.apk').replace(/\.aab$/, '-tauri.aab');
               await github.rest.repos.uploadReleaseAsset({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 release_id: parseInt(process.env.release_id),
-                name: path.basename(file),
+                name: newName,
                 data,
               });
-              console.log(`Uploaded: ${file}`);
+              console.log(`Uploaded: ${file} as ${newName}`);
             }
 
   # ── Desktop (Linux / macOS / Windows) ───────────────────────────────
