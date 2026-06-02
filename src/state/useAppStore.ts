@@ -4,16 +4,8 @@ import type { Project, Checkin, SyncState, CheckStatus } from '@/db/types'
 import { runFullSync, syncOneProject } from '@/sync/fullSync'
 import type { ConflictItem } from '@/db/types'
 
-function sortByOrder(projects: Project[], order: string[] | null): Project[] {
-  if (!order || order.length === 0) return projects
-  const map = new Map(projects.map(p => [p.id, p]))
-  const sorted: Project[] = []
-  for (const id of order) {
-    const p = map.get(id)
-    if (p) { sorted.push(p); map.delete(id) }
-  }
-  for (const p of map.values()) sorted.push(p)
-  return sorted
+function sortProjects(projects: Project[]): Project[] {
+  return [...projects].sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0) || b.updatedAt - a.updatedAt)
 }
 
 interface AppState {
@@ -48,10 +40,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       const repo = await getRepo()
       const lastSyncAt = await repo.getKV<number>('sync.lastAt')
       const lastSyncErr = await repo.getKV<string>('sync.lastError')
-      const projects = await repo.listProjects()
-      const order = await repo.getKV<string[]>('projectOrder')
+      const projects = sortProjects(await repo.listProjects())
       set({
-        projects: sortByOrder(projects, order),
+        projects,
         sync: {
           status: lastSyncErr ? 'error' : 'ok',
           at: lastSyncAt ?? null,
@@ -79,6 +70,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       unit: unit?.trim() || null,
       emoji,
       color,
+      sort: 0,
       createdAt: now,
       updatedAt: now,
       remoteEtag: null,
@@ -86,7 +78,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       deleted: 0,
     }
     await repo.upsertProject(project)
-    set(s => ({ projects: [project, ...s.projects] }))
+    set(s => ({ projects: sortProjects([project, ...s.projects]) }))
     void get().triggerSync()
     return project
   },
@@ -156,9 +148,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           set(s => ({ conflicts: { ...s.conflicts, [projectId]: items } }))
         },
         onProjectsChange: (projects) => {
-          repo.getKV<string[]>('projectOrder').then(order => {
-            set({ projects: sortByOrder(projects, order) })
-          })
+          set({ projects: sortProjects(projects) })
         },
       })
       const at = nowMs()
@@ -174,8 +164,18 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   async reorderProjects(orderedIds) {
     const repo = await getRepo()
-    await repo.setKV('projectOrder', orderedIds)
-    set(s => ({ projects: sortByOrder(s.projects, orderedIds) }))
+    const now = nowMs()
+    const projects = get().projects
+    const idSort = new Map(orderedIds.map((id, i) => [id, i]))
+    const next = projects.map(p => {
+      const sort = idSort.get(p.id)
+      return sort !== undefined ? { ...p, sort, updatedAt: now } : p
+    })
+    for (const p of next) {
+      if (idSort.has(p.id)) await repo.upsertProject(p)
+    }
+    set({ projects: next })
+    void get().triggerSync()
   },
 
   async resolveConflict(projectId, items) {

@@ -31,7 +31,9 @@ export class DexieRepo implements Repo {
 
   async listProjects(includeDeleted = false): Promise<Project[]> {
     const all = await this.db.projects.toArray()
-    return includeDeleted ? all : all.filter(p => p.deleted === 0)
+    const filtered = includeDeleted ? all : all.filter(p => p.deleted === 0)
+    filtered.sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0) || b.updatedAt - a.updatedAt)
+    return filtered
   }
 
   async getProject(id: string): Promise<Project | undefined> {

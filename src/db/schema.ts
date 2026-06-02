@@ -1,6 +1,6 @@
 import type { Project, Checkin, CheckStatus } from './types'
 
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 export const PROJECT_COLORS = [
   '#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#a855f7', '#06b6d4',

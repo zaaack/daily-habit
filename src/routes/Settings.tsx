@@ -149,6 +149,7 @@ export function Settings() {
         unit: (habit.daily_goal_unit as string) || null,
         emoji: '📌',
         color: PROJECT_COLORS[colorIdx],
+        sort: 0,
         createdAt: ((habit.create_t as number) ?? Math.floor(now / 1000)) * 1000,
         updatedAt: ((habit.modify_t as number) ?? Math.floor(now / 1000)) * 1000,
         remoteEtag: null,

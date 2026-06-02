@@ -8,6 +8,7 @@ export interface ProjectsTable {
   unit: string | null
   emoji: string
   color: string
+  sort: number
   created_at: number
   updated_at: number
   remote_etag: string | null
@@ -54,12 +55,17 @@ export abstract class SqliteKyselyRepo implements Repo {
       unit TEXT,
       emoji TEXT NOT NULL,
       color TEXT NOT NULL,
+      sort REAL NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       remote_etag TEXT,
       remote_path TEXT NOT NULL,
       deleted INTEGER NOT NULL DEFAULT 0
     )`.execute(db)
+
+    try {
+      await sql`ALTER TABLE projects ADD COLUMN sort REAL NOT NULL DEFAULT 0`.execute(db)
+    } catch { /* column already exists */ }
 
     await sql`CREATE TABLE IF NOT EXISTS checkins (
       project_id TEXT NOT NULL,
@@ -84,6 +90,7 @@ export abstract class SqliteKyselyRepo implements Repo {
       unit: r.unit,
       emoji: r.emoji,
       color: r.color,
+      sort: r.sort,
       createdAt: r.created_at,
       updatedAt: r.updated_at,
       remoteEtag: r.remote_etag,
@@ -106,8 +113,8 @@ export abstract class SqliteKyselyRepo implements Repo {
   async listProjects(includeDeleted = false): Promise<Project[]> {
     const db = await this.getDb()
     const rows = includeDeleted
-      ? await db.selectFrom('projects').selectAll().orderBy('updated_at', 'desc').execute()
-      : await db.selectFrom('projects').selectAll().where('deleted', '=', 0).orderBy('updated_at', 'desc').execute()
+      ? await db.selectFrom('projects').selectAll().orderBy('sort', 'asc').orderBy('updated_at', 'desc').execute()
+      : await db.selectFrom('projects').selectAll().where('deleted', '=', 0).orderBy('sort', 'asc').orderBy('updated_at', 'desc').execute()
     return rows.map(r => this.rowToProject(r))
   }
 
@@ -120,8 +127,8 @@ export abstract class SqliteKyselyRepo implements Repo {
   async upsertProject(p: Project): Promise<void> {
     const db = await this.getDb()
     await sql`INSERT OR REPLACE INTO projects
-      (id, name, unit, emoji, color, created_at, updated_at, remote_etag, remote_path, deleted)
-      VALUES (${p.id}, ${p.name}, ${p.unit}, ${p.emoji}, ${p.color}, ${p.createdAt}, ${p.updatedAt}, ${p.remoteEtag}, ${p.remotePath}, ${p.deleted})
+      (id, name, unit, emoji, color, sort, created_at, updated_at, remote_etag, remote_path, deleted)
+      VALUES (${p.id}, ${p.name}, ${p.unit}, ${p.emoji}, ${p.color}, ${p.sort}, ${p.createdAt}, ${p.updatedAt}, ${p.remoteEtag}, ${p.remotePath}, ${p.deleted})
     `.execute(db)
   }
 

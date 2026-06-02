@@ -131,6 +131,7 @@ export async function runFullSync(
     } else {
       const newProject: Project = {
         ...file.project,
+        sort: file.project.sort ?? 0,
         remotePath: path,
         remoteEtag: remoteByPath.get(filename),
         deleted: 0,

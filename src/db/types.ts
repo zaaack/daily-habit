@@ -6,6 +6,7 @@ export interface Project {
   unit: string | null
   emoji: string
   color: string
+  sort: number
   createdAt: number
   updatedAt: number
   remoteEtag: string | null
