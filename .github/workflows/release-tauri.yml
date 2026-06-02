@@ -47,16 +47,28 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const tagName = `v${process.env.VERSION}`;
+            try {
+              const { data: existing } = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: tagName,
+              });
+              console.log(`Reusing existing release ${existing.id} for tag ${tagName}`);
+              return existing.id;
+            } catch (e) {
+              if (e.status !== 404) throw e;
+            }
             const { data } = await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              tag_name: `v${process.env.VERSION}`,
+              tag_name: tagName,
               name: `Daily Habit v${process.env.VERSION}`,
               body: 'Take a look at the assets to download and install this app.',
               draft: true,
               prerelease: false
-            })
-            return data.id
+            });
+            return data.id;
         env:
           VERSION: ${{ steps.get-version.outputs.version }}
 
