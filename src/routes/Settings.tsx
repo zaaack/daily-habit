@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
 import { getSyncConfig, setSyncConfig, testConnection, syncOneProject, makeRemotePath, cleanupDeletedProjects } from '@/sync/fullSync'
 import type { WebDavConfig } from '@/sync/webdav'
-import type { ProjectFile } from '@/sync/merge'
+import { epochDayToDateStr, type ReadableProjectFile } from '@/sync/merge'
 import type { Checkin } from '@/db/types'
 import { DEFAULT_REMOTE_DIR, makeProjectId, PROJECT_COLORS } from '@/db/schema'
 import { getRepo } from '@/db'
@@ -63,14 +63,14 @@ export function Settings() {
   async function handleExport() {
     const repo = await getRepo()
     const projects = await repo.listProjects(true)
-    const data: ProjectFile[] = []
+    const data: ReadableProjectFile[] = []
     for (const p of projects) {
       const cs = await repo.getCheckins(p.id)
-      const { remoteEtag: _, ...project } = p
+      const { remoteEtag: _, remotePath: _rp, ...project } = p
       data.push({
         version: 1,
         project,
-        checkins: cs.map(c => ({ d: c.date, s: c.status, v: c.value, n: c.note, u: c.updatedAt })),
+        checkins: cs.map(c => ({ date: c.date, status: c.status, value: c.value, note: c.note, updatedAt: c.updatedAt })),
       })
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -97,21 +97,32 @@ export function Settings() {
   async function handleImport(file: File) {
     try {
       const text = await file.text()
-      const data = JSON.parse(text) as ProjectFile[]
-      if (!Array.isArray(data)) {
+      const raw = JSON.parse(text)
+      if (!Array.isArray(raw)) {
         alert(t('settings.invalidFormat'))
         return
       }
       const repo = await getRepo()
-      const total = data.filter(item => item.project?.id).length
+      const total = raw.filter((item: any) => item.project?.id).length
       setImporting({ current: 0, total })
       let processed = 0
-      for (const item of data) {
+      for (const item of raw) {
         if (!item.project?.id) continue
-        await repo.upsertProject({ ...item.project, remoteEtag: null, remotePath: makeRemotePath(item.project.id) })
+        const { remoteEtag: _re, remotePath: _rp, ...proj } = item.project
+        await repo.upsertProject({ ...proj, remoteEtag: null, remotePath: makeRemotePath(item.project.id) })
         const checkins: Checkin[] = []
-        for (const c of item.checkins) {
-          checkins.push({ projectId: item.project.id, date: c.d, status: c.s, value: c.v, note: c.n, updatedAt: c.u })
+        for (const c of item.checkins ?? []) {
+          if ('date' in c) {
+            // readable format: { date, status, value, note, updatedAt }
+            checkins.push({ projectId: item.project.id, date: c.date, status: c.status, value: c.value, note: c.note, updatedAt: c.updatedAt })
+          } else if (typeof c.d === 'number') {
+            // compact sync format: { d: epochDay, s: 0|1, ... }
+            const { compactToCheckin } = await import('@/sync/merge')
+            checkins.push(compactToCheckin(item.project.id, c))
+          } else {
+            // old abbreviated format: { d: dateStr, s: 'success'|'fail', ... }
+            checkins.push({ projectId: item.project.id, date: c.d, status: c.s, value: c.v, note: c.n, updatedAt: c.u })
+          }
         }
         if (checkins.length > 0) await repo.bulkUpsertCheckins(checkins)
         processed++
@@ -155,14 +166,6 @@ export function Settings() {
     } finally {
       setCleaning(false)
     }
-  }
-
-  function epochDayToDateStr(epochDay: number): string {
-    const d = new Date(epochDay * 86400000)
-    const y = d.getUTCFullYear()
-    const m = String(d.getUTCMonth() + 1).padStart(2, '0')
-    const day = String(d.getUTCDate()).padStart(2, '0')
-    return `${y}-${m}-${day}`
   }
 
   async function importMhabit(habits: unknown[]) {

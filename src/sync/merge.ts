@@ -1,19 +1,66 @@
 import type { Project, Checkin, CheckStatus, ConflictItem } from '@/db/types'
 
+export interface CompactCheckin { d: number; s: 0 | 1; v: number | null; n: string | null; u: number }
+
 export interface ProjectFile {
-  version: number
-  project: Omit<Project, 'remoteEtag'>
-  checkins: { d: string; s: CheckStatus; v: number | null; n: string | null; u: number }[]
+  version: 2
+  project: Omit<Project, 'remoteEtag' | 'remotePath'>
+  checkins: CompactCheckin[]
 }
 
+export interface ReadableCheckin { date: string; status: CheckStatus; value: number | null; note: string | null; updatedAt: number }
+
+export interface ReadableProjectFile {
+  version: 1
+  project: Omit<Project, 'remoteEtag' | 'remotePath'>
+  checkins: ReadableCheckin[]
+}
+
+// ---- date ↔ epoch-day helpers ----
+
+export function dateStrToEpochDay(s: string): number {
+  const [y, m, d] = s.split('-').map(Number)
+  return Math.floor(Date.UTC(y, m - 1, d) / 86400000)
+}
+
+export function epochDayToDateStr(epochDay: number): string {
+  const d = new Date(epochDay * 86400000)
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+}
+
+// ---- compact (sync) ↔ Checkin converters ----
+
+export function checkinToCompact(c: Checkin): CompactCheckin {
+  return {
+    d: dateStrToEpochDay(c.date),
+    s: c.status === 'success' ? 1 : 0,
+    v: c.value,
+    n: c.note,
+    u: c.updatedAt,
+  }
+}
+
+export function compactToCheckin(projectId: number | string, c: CompactCheckin): Checkin {
+  return {
+    projectId: String(projectId),
+    date: epochDayToDateStr(c.d),
+    status: c.s === 1 ? 'success' : 'fail',
+    value: c.v,
+    note: c.n,
+    updatedAt: c.u,
+  }
+}
+
+type ProjectMeta = Omit<Project, 'remoteEtag' | 'remotePath'>
+
 export interface MergeResult {
-  project: Omit<Project, 'remoteEtag'>
+  project: ProjectMeta
   checkins: Checkin[]
   conflicts: ConflictItem[]
   changed: boolean
 }
 
-export function emptyMergeResult(project: Omit<Project, 'remoteEtag'>, checkins: Checkin[] = []): MergeResult {
+export function emptyMergeResult(project: ProjectMeta, checkins: Checkin[] = []): MergeResult {
   return { project, checkins, conflicts: [], changed: false }
 }
 
@@ -24,18 +71,11 @@ export function emptyMergeResult(project: Omit<Project, 'remoteEtag'>, checkins:
  *   同 date 两端都被改过且 status/value/note 任一不同 → 冲突
  */
 export function mergeProjectFile(
-  local: Omit<Project, 'remoteEtag'>,
+  local: ProjectMeta,
   localCheckins: Checkin[],
   remote: ProjectFile,
 ): MergeResult {
-  const remoteCheckins: Checkin[] = remote.checkins.map(c => ({
-    projectId: remote.project.id,
-    date: c.d,
-    status: c.s,
-    value: c.v,
-    note: c.n,
-    updatedAt: c.u,
-  }))
+  const remoteCheckins: Checkin[] = remote.checkins.map(c => compactToCheckin(remote.project.id, c))
   const conflicts: ConflictItem[] = []
   let project = local
   let projectChanged = false

@@ -1,5 +1,5 @@
 import { getClient, normalizeDir, type WebDavConfig } from './webdav'
-import { mergeProjectFile, type ProjectFile } from './merge'
+import { mergeProjectFile, checkinToCompact, compactToCheckin, dateStrToEpochDay, type ProjectFile } from './merge'
 import type { Repo } from '@/db/repo/Repo'
 import type { Project, Checkin } from '@/db/types'
 import type { WebDAVClient } from 'webdav'
@@ -192,7 +192,7 @@ export async function runFullSync(
         deleted: 0,
       } as Project
       await repo.upsertProject(newProject)
-      for (const c of file.checkins) await repo.upsertCheckin({ projectId: file.project.id, date: c.d, status: c.s, value: c.v, note: c.n, updatedAt: c.u })
+      for (const c of file.checkins) await repo.upsertCheckin(compactToCheckin(file.project.id, c))
     }
     changed = true
   }
@@ -320,7 +320,7 @@ async function fetchRemoteFile(client: WebDAVClient, path: string, ifNoneMatch: 
     console.log('[sync] fetchRemoteFile path:', path, 'ifNoneMatch:', ifNoneMatch)
     const data = await client.getFileContents(path, { format: 'text', headers })
     console.log('[sync] fetchRemoteFile success, data type:', typeof data, 'length:', String(data).length)
-    return JSON.parse(data as string) as ProjectFile
+    return normalizeProjectFile(JSON.parse(data as string))
   } catch (e: any) {
     console.warn('[sync] fetchRemoteFile error:', e?.status, e?.message || e)
     if (e?.status === 304) return null
@@ -328,16 +328,34 @@ async function fetchRemoteFile(client: WebDAVClient, path: string, ifNoneMatch: 
   }
 }
 
-async function buildFile(p: Project, checkins: Checkin[]): Promise<ProjectFile> {
+/** 把旧格式 (version 1) 和新格式 (version 2) 统一为 compact 格式 */
+function normalizeProjectFile(raw: any): ProjectFile {
+  if (raw?.version === 2) return raw as ProjectFile
+  // version 1 (old): d=string, s='success'|'fail', project may include remotePath
+  const { remotePath: _rp, ...proj } = raw?.project ?? {}
   return {
-    version: 1,
-    project: stripProject(p),
-    checkins: checkins.map(c => ({ d: c.date, s: c.status, v: c.value, n: c.note, u: c.updatedAt })),
+    version: 2,
+    project: proj,
+    checkins: (raw?.checkins ?? []).map((c: any) => ({
+      d: typeof c.d === 'number' ? c.d : dateStrToEpochDay(c.d),
+      s: c.s === 'success' || c.s === 1 ? 1 : 0,
+      v: c.v ?? null,
+      n: c.n ?? null,
+      u: c.u,
+    })),
   }
 }
 
-function stripProject(p: Project): Omit<Project, 'remoteEtag'> {
-  const { remoteEtag: _, ...rest } = p
+async function buildFile(p: Project, checkins: Checkin[]): Promise<ProjectFile> {
+  return {
+    version: 2,
+    project: stripProject(p),
+    checkins: checkins.map(checkinToCompact),
+  }
+}
+
+function stripProject(p: Project): Omit<Project, 'remoteEtag' | 'remotePath'> {
+  const { remoteEtag: _, remotePath: _rp, ...rest } = p
   return rest
 }
 
