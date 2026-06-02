@@ -32,7 +32,7 @@ export function StatusCell({ projectId, date, checkin, unit, color, compact, ref
 
   const base = 'relative grid place-items-center rounded-md border select-none transition active:scale-90'
   const sizeCls = compact ? 'h-7 w-7 text-[10px]' : 'h-9 w-9 text-xs'
-  const defaultCls = '!bg-slate-800/60 !border-slate-600 !text-slate-400'
+  const defaultCls = '!bg-transparent !border-slate-600 !text-slate-400'
 
   function handleClick() {
     setOptimistic(nextStatus(checkin?.status))
