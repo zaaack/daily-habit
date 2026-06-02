@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/state/useAppStore'
-import { getSyncConfig, setSyncConfig, testConnection, syncOneProject } from '@/sync/fullSync'
+import { getSyncConfig, setSyncConfig, testConnection, syncOneProject, makeRemotePath } from '@/sync/fullSync'
 import type { WebDavConfig } from '@/sync/webdav'
+import type { ProjectFile } from '@/sync/merge'
 import { DEFAULT_REMOTE_DIR } from '@/db/schema'
 import { getRepo } from '@/db'
 import { Download, Upload, Trash2, Sun, Moon, Monitor } from 'lucide-react'
@@ -57,12 +58,16 @@ export function Settings() {
   async function handleExport() {
     const repo = await getRepo()
     const projects = await repo.listProjects(true)
-    const allCheckins: unknown[] = []
+    const data: ProjectFile[] = []
     for (const p of projects) {
       const cs = await repo.getCheckins(p.id)
-      for (const c of cs) allCheckins.push(c)
+      const { remoteEtag: _, ...project } = p
+      data.push({
+        version: 1,
+        project,
+        checkins: cs.map(c => [c.date, c.status, c.value, c.note, c.updatedAt]),
+      })
     }
-    const data = { projects, checkins: allCheckins, exportedAt: Date.now() }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -75,18 +80,17 @@ export function Settings() {
   async function handleImport(file: File) {
     try {
       const text = await file.text()
-      const data = JSON.parse(text) as { projects?: unknown[]; checkins?: unknown[] }
-      if (!Array.isArray(data.projects) || !Array.isArray(data.checkins)) {
-        alert('文件格式不正确（应包含 projects 和 checkins 数组）')
+      const data = JSON.parse(text) as ProjectFile[]
+      if (!Array.isArray(data)) {
+        alert('文件格式不正确')
         return
       }
       const repo = await getRepo()
-      for (const p of data.projects) {
-        if (p && typeof p === 'object' && 'id' in p) await repo.upsertProject(p as Parameters<typeof repo.upsertProject>[0])
-      }
-      for (const c of data.checkins) {
-        if (c && typeof c === 'object' && 'projectId' in c && 'date' in c) {
-          await repo.upsertCheckin(c as Parameters<typeof repo.upsertCheckin>[0])
+      for (const item of data) {
+        if (!item.project?.id) continue
+        await repo.upsertProject({ ...item.project, remoteEtag: null, remotePath: makeRemotePath(item.project.id) })
+        for (const c of item.checkins) {
+          await repo.upsertCheckin({ projectId: item.project.id, date: c[0], status: c[1], value: c[2], note: c[3], updatedAt: c[4] })
         }
       }
       const projects = await repo.listProjects()

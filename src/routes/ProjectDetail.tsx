@@ -6,6 +6,7 @@ import { todayStr } from '@/db/schema'
 import type { Checkin } from '@/db/types'
 import { StatusCell } from '@/components/StatusCell'
 import { ProjectEditor } from '@/components/ProjectEditor'
+import { MonthlyStatsChart } from '@/components/MonthlyStatsChart'
 import { ValueTrendChart } from '@/components/ValueTrendChart'
 import { cn } from '@/lib/cn'
 
@@ -29,14 +30,15 @@ function monthDiff(y1: number, m1: number, y2: number, m2: number): number {
 }
 
 function pageToMonthYear(pageNum: number): [number, number] {
-  const refSunday = getSunday(todayStr())
-  refSunday.setDate(refSunday.getDate() + pageNum * 35 + 14)
-  return [refSunday.getFullYear(), refSunday.getMonth() + 1]
+  const [ty, tm] = todayStr().split('-').map(Number)
+  let total = ty * 12 + (tm - 1) + pageNum
+  return [Math.floor(total / 12), (total % 12) + 1]
 }
 
 function buildPage(pageNum: number): WeekRow[] {
-  const refSunday = getSunday(todayStr())
-  refSunday.setDate(refSunday.getDate() + pageNum * 35)
+  const [targetYear, targetMonth] = pageToMonthYear(pageNum)
+  const firstOfMonth = new Date(targetYear, targetMonth - 1, 1)
+  const startSunday = getSunday(dateToStr(firstOfMonth))
 
   const result: WeekRow[] = []
   let prevMonth = -1
@@ -44,11 +46,11 @@ function buildPage(pageNum: number): WeekRow[] {
   for (let w = 0; w < 5; w++) {
     const days: (string | null)[] = []
     for (let d = 0; d < 7; d++) {
-      const date = new Date(refSunday)
+      const date = new Date(startSunday)
       date.setDate(date.getDate() + w * 7 + d)
       days.push(dateToStr(date))
     }
-    const midDate = new Date(refSunday)
+    const midDate = new Date(startSunday)
     midDate.setDate(midDate.getDate() + w * 7 + 3)
     const month = midDate.getMonth()
     result.push({
@@ -126,8 +128,7 @@ export function ProjectDetail() {
 
   const navigateToMonth = useCallback((year: number, month: number) => {
     const [ty, tm] = today.split('-').map(Number)
-    const diff = monthDiff(ty, tm, year, month)
-    setPageNum(Math.round(diff * 4.345))
+    setPageNum(monthDiff(ty, tm, year, month))
     setPickerOpen(false)
   }, [today])
 
@@ -270,8 +271,8 @@ export function ProjectDetail() {
               transition: isDragging ? 'none' : 'transform 0.3s ease',
             }}
           >
-            <div className="space-y-2">{renderWeeks(pages.prev)}</div>
-            <div ref={currRef} className="space-y-2">{renderWeeks(pages.curr)}</div>
+            <div className="space-y-2 mb-2">{renderWeeks(pages.prev)}</div>
+            <div ref={currRef} className="space-y-2 mb-2">{renderWeeks(pages.curr)}</div>
             <div className="space-y-2">{renderWeeks(pages.next)}</div>
           </div>
         </div>
@@ -283,6 +284,11 @@ export function ProjectDetail() {
           <ValueTrendChart checkins={checkins} color={project.color} currentYear={ty} currentMonth={tm - 1} />
         </div>
       )}
+
+      <div className="card">
+        <div className="text-sm font-semibold mb-2">月度统计</div>
+        <MonthlyStatsChart checkins={checkins} color={project.color} currentYear={ty} currentMonth={tm - 1} unit={project.unit} />
+      </div>
 
       <Link to={`/history?project=${project.id}`} className="card flex items-center justify-center text-sm text-brand-600 hover:text-brand-500">
         查看全部历史 →

@@ -1,9 +1,9 @@
-import type { Project, Checkin, ConflictItem } from '@/db/types'
+import type { Project, Checkin, CheckStatus, ConflictItem } from '@/db/types'
 
 export interface ProjectFile {
   version: number
   project: Omit<Project, 'remoteEtag'>
-  checkins: Checkin[]
+  checkins: [string, CheckStatus, number | null, string | null, number][]
 }
 
 export interface MergeResult {
@@ -28,6 +28,14 @@ export function mergeProjectFile(
   localCheckins: Checkin[],
   remote: ProjectFile,
 ): MergeResult {
+  const remoteCheckins: Checkin[] = remote.checkins.map(t => ({
+    projectId: remote.project.id,
+    date: t[0],
+    status: t[1],
+    value: t[2],
+    note: t[3],
+    updatedAt: t[4],
+  }))
   const conflicts: ConflictItem[] = []
   let project = local
   let projectChanged = false
@@ -57,7 +65,7 @@ export function mergeProjectFile(
   const merged: Checkin[] = []
   const seenDates = new Set<string>()
 
-  for (const rc of remote.checkins) {
+  for (const rc of remoteCheckins) {
     seenDates.add(rc.date)
     const lc = map.get(rc.date)
     if (!lc) {
