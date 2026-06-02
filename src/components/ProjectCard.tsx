@@ -44,13 +44,12 @@ export function ProjectCard({ project, dates }: { project: Project; dates: strin
       <div className="grid grid-cols-7 gap-1">
         {dates.map(d => {
           const c = byDate.get(d)
-          const isToday = d === today
-          const isPast = d < today
+          const isFuture = d > today
           return (
             <div
               key={d}
               className={cn(
-                isToday ? '' : isPast ? 'opacity-40' : 'opacity-70',
+                isFuture && 'opacity-30',
               )}
             >
               <StatusCell
