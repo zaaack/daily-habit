@@ -1,4 +1,4 @@
-import { createClient, type WebDAVClient } from 'webdav'
+import type { WebDAVClient } from 'webdav'
 
 export interface WebDavConfig {
   url: string
@@ -10,8 +10,9 @@ export interface WebDavConfig {
 let _client: WebDAVClient | null = null
 let _clientCfg: WebDavConfig | null = null
 
-export function getClient(cfg: WebDavConfig): WebDAVClient {
+export async function getClient(cfg: WebDavConfig): Promise<WebDAVClient> {
   if (_client && _clientCfg && sameCfg(_clientCfg, cfg)) return _client
+  const { createClient } = await import('webdav')
   _client = createClient(cfg.url, {
     username: cfg.username,
     password: cfg.password,

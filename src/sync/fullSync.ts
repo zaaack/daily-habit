@@ -2,6 +2,7 @@ import { getClient, normalizeDir, type WebDavConfig } from './webdav'
 import { mergeProjectFile, type ProjectFile } from './merge'
 import type { Repo } from '@/db/repo/Repo'
 import type { Project, Checkin } from '@/db/types'
+import type { WebDAVClient } from 'webdav'
 import { makeRemotePath } from '@/db/schema'
 
 const SYNC_CONFIG_KEY = 'webdav.config'
@@ -26,7 +27,7 @@ export function setSyncConfig(cfg: WebDavConfig): void {
 
 export async function testConnection(cfg: WebDavConfig): Promise<{ ok: boolean; message: string }> {
   try {
-    const client = getClient(cfg)
+    const client = await getClient(cfg)
     const exists = await client.exists(cfg.remoteDir)
     if (!exists) {
       await client.createDirectory(cfg.remoteDir, { recursive: true })
@@ -43,7 +44,7 @@ export async function runFullSync(
 ): Promise<void> {
   const cfg = getSyncConfig()
   if (!cfg) return
-  const client = getClient(cfg)
+  const client = await getClient(cfg)
   console.log('[sync] runFullSync start, remoteDir:', cfg.remoteDir)
 
   // 1. 列出远端
@@ -178,7 +179,7 @@ export async function syncOneProject(projectId: string): Promise<void> {
   if (!cfg) return
   const p = await repo.getProject(projectId)
   if (!p) return
-  const client = getClient(cfg)
+  const client = await getClient(cfg)
   const localCheckins = await repo.getCheckins(p.id)
   console.log('[sync] syncOneProject', p.name, 'remotePath:', p.remotePath, 'localEtag:', p.remoteEtag)
 
@@ -228,7 +229,7 @@ export async function syncOneProject(projectId: string): Promise<void> {
   }
 }
 
-async function getDirEntryEtag(client: ReturnType<typeof getClient>, path: string): Promise<string | null> {
+async function getDirEntryEtag(client: WebDAVClient, path: string): Promise<string | null> {
   try {
     const dir = path.split('/').slice(0, -1).join('/') || '/'
     const name = path.split('/').pop()!
@@ -248,7 +249,7 @@ async function getDirEntryEtag(client: ReturnType<typeof getClient>, path: strin
   }
 }
 
-async function fetchRemoteFile(client: ReturnType<typeof getClient>, path: string, ifNoneMatch: string | null): Promise<ProjectFile | null> {
+async function fetchRemoteFile(client: WebDAVClient, path: string, ifNoneMatch: string | null): Promise<ProjectFile | null> {
   try {
     const headers: Record<string, string> = {}
     if (ifNoneMatch) headers['If-None-Match'] = ifNoneMatch
@@ -279,7 +280,7 @@ function stripProject(p: Project): Omit<Project, 'remoteEtag'> {
 export async function cleanupDeletedProjects(): Promise<{ cleaned: number } | null> {
   const cfg = getSyncConfig()
   if (!cfg) return null
-  const client = getClient(cfg)
+  const client = await getClient(cfg)
   const { getRepo } = await import('@/db')
   const repo = await getRepo()
 

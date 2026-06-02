@@ -2,7 +2,7 @@ import type { Repo } from './repo/Repo'
 import { SqlocalRepo } from './repo/SqlocalRepo'
 import { DexieRepo } from './repo/DexieRepo'
 import { SqliteRepo } from './repo/SqliteRepo'
-import { isAndroid } from '@/lib/platform'
+import { isAndroid, isTauri } from '@/lib/platform'
 
 let _instance: Repo | null = null
 let _initPromise: Promise<Repo> | null = null
@@ -14,6 +14,14 @@ export async function getRepo(): Promise<Repo> {
   _initPromise = (async () => {
     if (isAndroid) {
       const repo = new SqliteRepo()
+      await repo.init()
+      _instance = repo
+      return repo
+    }
+
+    if (isTauri) {
+      const { TauriRepo } = await import('./repo/TauriRepo')
+      const repo = new TauriRepo()
       await repo.init()
       _instance = repo
       return repo
