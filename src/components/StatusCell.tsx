@@ -33,7 +33,7 @@ export function StatusCell({ projectId, date, checkin, unit, color, compact, ref
   const isToday = date === todayStr()
 
   const base = 'relative grid place-items-center rounded-md border select-none transition active:scale-90'
-  const sizeCls = compact ? 'h-8 w-8 text-[11px]' : 'h-9 w-9 text-xs'
+  const sizeCls = compact ? 'h-9 w-9 text-xs' : 'h-9 w-9 text-xs'
   const todayCls = isToday ? '!font-bold !border-2' : ''
   const defaultCls = '!bg-transparent !border-slate-600 !text-slate-400'
 

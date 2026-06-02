@@ -40,7 +40,7 @@ export function Home() {
   return (
     <div className="space-y-3">
       <div className="card">
-        <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
+        <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
           <span className="tabular-nums">{rangeLabel}</span>
           <div className="flex-1" />
           {!isCurrent && (
@@ -53,7 +53,7 @@ export function Home() {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-7 gap-1.5 text-[11px]">
+        <div className="grid grid-cols-7 gap-1.5 text-xs">
           {dates.map(d => {
             const dow = new Date(d + 'T00:00:00').getDay()
             const isToday = d === today
