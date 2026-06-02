@@ -170,7 +170,7 @@ export function ProjectDetail() {
               const c = byDate.get(d)
               const isToday = d === today
               return (
-                <div key={d} className={cn('flex justify-center', isToday && 'ring-1 ring-brand-500 rounded-md')}>
+                <div key={d} className={cn('flex justify-center', isToday && 'border-2 border-brand-500 rounded-md')}>
                   <StatusCell
                     projectId={project.id}
                     date={d}
@@ -209,53 +209,51 @@ export function ProjectDetail() {
       </div>
 
       <div className="card">
-        <div className="flex items-center justify-between mb-1">
-          <div className="relative">
-            <button
-              className="flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-brand-500"
-              onClick={() => setPickerOpen(v => !v)}
-            >
-              {viewYear} 年 {viewMonth} 月
-              <ChevronDown size={14} className={cn('transition-transform', pickerOpen && 'rotate-180')} />
-            </button>
-            {pickerOpen && (
-              <div className="absolute left-0 top-full mt-1 z-10 bg-white rounded-lg shadow-lg border border-slate-200 p-2 min-w-[200px]">
-                <div className="flex items-center gap-2 mb-2">
-                  <select
-                    className="flex-1 text-sm border border-slate-200 rounded px-2 py-1"
-                    value={viewYear}
-                    onChange={e => {
-                      const y = Number(e.target.value)
-                      navigateToMonth(y, viewMonth)
-                    }}
-                  >
-                    {Array.from({ length: 11 }, (_, i) => ty - 5 + i).map(y => (
-                      <option key={y} value={y}>{y} 年</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid grid-cols-4 gap-1">
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                    <button
-                      key={m}
-                      className={cn(
-                        'text-xs py-1.5 rounded',
-                        m === viewMonth
-                          ? 'bg-brand-500 text-white'
-                          : 'text-slate-600 hover:bg-slate-100'
-                      )}
-                      onClick={() => navigateToMonth(viewYear, m)}
-                    >
-                      {m} 月
-                    </button>
+        <div className="relative mb-2">
+          <button
+            className="flex items-center gap-1 text-sm font-semibold text-slate-800 hover:text-brand-500"
+            onClick={() => setPickerOpen(v => !v)}
+          >
+            {viewYear} 年 {viewMonth} 月
+            <ChevronDown size={14} className={cn('transition-transform', pickerOpen && 'rotate-180')} />
+          </button>
+          {pickerOpen && (
+            <div className="absolute left-0 top-full mt-1 z-10 bg-white rounded-lg shadow-lg border border-slate-200 p-2 min-w-[200px]">
+              <div className="flex items-center gap-2 mb-2">
+                <select
+                  className="flex-1 text-sm border border-slate-200 rounded px-2 py-1"
+                  value={viewYear}
+                  onChange={e => {
+                    const y = Number(e.target.value)
+                    navigateToMonth(y, viewMonth)
+                  }}
+                >
+                  {Array.from({ length: 11 }, (_, i) => ty - 5 + i).map(y => (
+                    <option key={y} value={y}>{y} 年</option>
                   ))}
-                </div>
+                </select>
               </div>
-            )}
-          </div>
-          <div className="grid grid-cols-7 gap-1 text-[10px] text-slate-500 flex-1 ml-3">
-            {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="text-center">{d}</div>)}
-          </div>
+              <div className="grid grid-cols-4 gap-1">
+                {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                  <button
+                    key={m}
+                    className={cn(
+                      'text-xs py-1.5 rounded',
+                      m === viewMonth
+                        ? 'bg-brand-500 text-white'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    )}
+                    onClick={() => navigateToMonth(viewYear, m)}
+                  >
+                    {m} 月
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-[10px] text-slate-800 mb-1">
+          {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="text-center">{d}</div>)}
         </div>
         <div
           className="overflow-hidden select-none cursor-grab active:cursor-grabbing"
@@ -285,7 +283,7 @@ export function ProjectDetail() {
         </div>
       )}
 
-      <Link to={`/history?project=${project.id}`} className="card flex items-center justify-center text-sm text-brand-400 hover:text-brand-300">
+      <Link to={`/history?project=${project.id}`} className="card flex items-center justify-center text-sm text-brand-600 hover:text-brand-500">
         查看全部历史 →
       </Link>
 
