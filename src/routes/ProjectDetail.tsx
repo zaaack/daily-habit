@@ -14,41 +14,41 @@ interface WeekRow {
   days: (string | null)[]
 }
 
-function buildWeeks(monthOffsetStart: number, monthOffsetEnd: number): WeekRow[] {
-  const today = todayStr()
-  const [ty, tm] = today.split('-').map(Number)
+function dateToStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function getSunday(dateStr: string): Date {
+  const d = new Date(dateStr + 'T00:00:00')
+  d.setDate(d.getDate() - d.getDay())
+  return d
+}
+
+function buildPage(pageNum: number): WeekRow[] {
+  const refSunday = getSunday(todayStr())
+  refSunday.setDate(refSunday.getDate() + pageNum * 35)
+
   const result: WeekRow[] = []
   let prevMonth = -1
 
-  for (let mo = monthOffsetStart; mo <= monthOffsetEnd; mo++) {
-    const base = new Date(ty, tm - 1 + mo, 1)
-    const year = base.getFullYear()
-    const month = base.getMonth()
-    const daysInMonth = new Date(year, month + 1, 0).getDate()
-    const label = `${year} 年 ${month + 1} 月`
-
-    const firstDow = new Date(year, month, 1).getDay()
-    let week: (string | null)[] = Array(firstDow).fill(null)
-
-    for (let d = 1; d <= daysInMonth; d++) {
-      const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-      week.push(ds)
-      if (week.length === 7) {
-        result.push({ monthLabel: prevMonth !== month ? label : null, days: week })
-        prevMonth = month
-        week = []
-      }
+  for (let w = 0; w < 5; w++) {
+    const days: (string | null)[] = []
+    for (let d = 0; d < 7; d++) {
+      const date = new Date(refSunday)
+      date.setDate(date.getDate() + w * 7 + d)
+      days.push(dateToStr(date))
     }
-    if (week.length) {
-      while (week.length < 7) week.push(null)
-      result.push({ monthLabel: prevMonth !== month ? label : null, days: week })
-      prevMonth = month
-    }
+    const midDate = new Date(refSunday)
+    midDate.setDate(midDate.getDate() + w * 7 + 3)
+    const month = midDate.getMonth()
+    result.push({
+      monthLabel: prevMonth !== month ? `${midDate.getFullYear()} 年 ${month + 1} 月` : null,
+      days,
+    })
+    prevMonth = month
   }
   return result
 }
-
-const WEEKS_PER_PAGE = 5
 
 export function ProjectDetail() {
   const { id = '' } = useParams<{ id: string }>()
@@ -60,75 +60,56 @@ export function ProjectDetail() {
   const [editorOpen, setEditorOpen] = useState(false)
 
   const today = todayStr()
-  const weeks = useMemo(() => buildWeeks(-12, 12), [])
-  const pages = useMemo(() => {
-    const result: WeekRow[][] = []
-    for (let i = 0; i < weeks.length; i += WEEKS_PER_PAGE) {
-      result.push(weeks.slice(i, i + WEEKS_PER_PAGE))
-    }
-    return result
-  }, [weeks])
-
-  const todayPageIdx = useMemo(() => {
-    for (let i = 0; i < weeks.length; i++) {
-      if (weeks[i].days.some(d => d === today)) return Math.floor(i / WEEKS_PER_PAGE)
-    }
-    return 0
-  }, [weeks, today])
-
-  const [page, setPage] = useState(todayPageIdx)
-  const [dragX, setDragX] = useState(0)
+  const [pageNum, setPageNum] = useState(0)
+  const [dragY, setDragY] = useState(0)
   const dragging = useRef(false)
-  const startX = useRef(0)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [containerWidth, setContainerWidth] = useState(0)
+  const startY = useRef(0)
+  const [pageH, setPageH] = useState(0)
+  const currRef = useRef<HTMLDivElement>(null)
+
+  const pages = useMemo(() => ({
+    prev: buildPage(pageNum - 1),
+    curr: buildPage(pageNum),
+    next: buildPage(pageNum + 1),
+  }), [pageNum])
 
   useEffect(() => {
-    setPage(todayPageIdx)
-  }, [todayPageIdx])
-
-  useEffect(() => {
-    const measure = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth)
-      }
-    }
+    const el = currRef.current
+    if (!el) return
+    const measure = () => setPageH(el.offsetHeight)
     measure()
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
-  }, [])
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [pageNum])
 
-  const snapToPage = useCallback((deltaX: number) => {
-    const threshold = containerWidth * 0.2
-    setPage(prev => {
-      if (deltaX < -threshold) return Math.min(prev + 1, pages.length - 1)
-      if (deltaX > threshold) return Math.max(prev - 1, 0)
-      return prev
-    })
-    setDragX(0)
-  }, [pages.length, containerWidth])
+  const snapToPage = useCallback((deltaY: number) => {
+    const threshold = pageH * 0.2
+    if (deltaY < -threshold) setPageNum(p => p + 1)
+    else if (deltaY > threshold) setPageNum(p => p - 1)
+    setDragY(0)
+  }, [pageH])
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     dragging.current = true
-    startX.current = e.clientX
-    setDragX(0)
-    containerRef.current?.setPointerCapture?.(e.pointerId)
+    startY.current = e.clientY
+    setDragY(0)
   }, [])
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragging.current) return
-    setDragX(e.clientX - startX.current)
+    setDragY(e.clientY - startY.current)
   }, [])
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
     if (!dragging.current) return
     dragging.current = false
-    snapToPage(e.clientX - startX.current)
+    snapToPage(e.clientY - startY.current)
   }, [snapToPage])
 
   const goToCurrent = useCallback(() => {
-    setPage(todayPageIdx)
-  }, [todayPageIdx])
+    setPageNum(0)
+  }, [])
 
   const byDate = new Map(checkins.map(c => [c.date, c]))
   const [ty, tm] = today.split('-').map(Number)
@@ -155,8 +136,40 @@ export function ProjectDetail() {
     )
   }
 
-  const offset = -(page * containerWidth) + dragX
-  const isDragging = dragX !== 0
+  const offset = -pageH + dragY
+  const isDragging = dragY !== 0
+
+  const renderWeeks = (weeks: WeekRow[]) =>
+    weeks.map((w, wi) => {
+      const hasToday = w.days.some(d => d === today)
+      return (
+        <div key={wi}>
+          {w.monthLabel && (
+            <div className="text-[10px] text-slate-500 font-semibold pb-0.5">{w.monthLabel}</div>
+          )}
+          <div className={cn('grid grid-cols-7 gap-1', hasToday && 'bg-brand-500/5 rounded-md')}>
+            {w.days.map((d, j) => {
+              if (!d) return <div key={j} />
+              const c = byDate.get(d)
+              const isToday = d === today
+              return (
+                <div key={d} className={cn('flex justify-center', isToday && 'ring-1 ring-brand-500 rounded-md')}>
+                  <StatusCell
+                    projectId={project.id}
+                    date={d}
+                    checkin={c}
+                    unit={project.unit}
+                    color={project.color}
+                    refreshKey={tick}
+                    onCycle={() => void cycle(project.id, d)}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )
+    })
 
   return (
     <div className="space-y-3">
@@ -183,70 +196,23 @@ export function ProjectDetail() {
           {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="text-center">{d}</div>)}
         </div>
         <div
-          ref={containerRef}
-          className="overflow-hidden touch-pan-y select-none cursor-grab active:cursor-grabbing"
+          className="overflow-hidden select-none cursor-grab active:cursor-grabbing"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
-          style={{ touchAction: 'pan-y' }}
+          style={{ touchAction: 'none', height: pageH || 'auto' }}
         >
           <div
-            className="flex"
             style={{
-              width: `${pages.length * 100}%`,
-              transform: `translateX(${offset}px)`,
+              transform: `translateY(${offset}px)`,
               transition: isDragging ? 'none' : 'transform 0.3s ease',
             }}
           >
-            {pages.map((pg, pi) => (
-              <div
-                key={pi}
-                style={{ width: `${100 / pages.length}%` }}
-                className="space-y-2"
-              >
-                {pg.map((w, wi) => {
-                  const hasToday = w.days.some(d => d === today)
-                  return (
-                    <div key={wi}>
-                      {w.monthLabel && (
-                        <div className="text-[10px] text-slate-500 font-semibold pb-0.5">{w.monthLabel}</div>
-                      )}
-                      <div className={cn('grid grid-cols-7 gap-1', hasToday && 'bg-brand-500/5 rounded-md')}>
-                        {w.days.map((d, j) => {
-                          if (!d) return <div key={j} />
-                          const c = byDate.get(d)
-                          const isToday = d === today
-                          return (
-                            <div key={d} className={cn('flex justify-center', isToday && 'ring-1 ring-brand-500 rounded-md')}>
-                              <StatusCell
-                                projectId={project.id}
-                                date={d}
-                                checkin={c}
-                                unit={project.unit}
-                                color={project.color}
-                                refreshKey={tick}
-                                onCycle={() => void cycle(project.id, d)}
-                              />
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ))}
+            <div className="space-y-2">{renderWeeks(pages.prev)}</div>
+            <div ref={currRef} className="space-y-2">{renderWeeks(pages.curr)}</div>
+            <div className="space-y-2">{renderWeeks(pages.next)}</div>
           </div>
-        </div>
-        <div className="flex justify-center gap-1 mt-2">
-          {pages.map((_, i) => (
-            <button
-              key={i}
-              className={cn('w-1.5 h-1.5 rounded-full transition-colors', i === page ? 'bg-brand-500' : 'bg-slate-300')}
-              onClick={() => setPage(i)}
-            />
-          ))}
         </div>
       </div>
 
