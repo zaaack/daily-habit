@@ -136,7 +136,7 @@ export async function runFullSync(
         deleted: 0,
       } as Project
       await repo.upsertProject(newProject)
-      for (const c of file.checkins) await repo.upsertCheckin({ projectId: file.project.id, date: c[0], status: c[1], value: c[2], note: c[3], updatedAt: c[4] })
+      for (const c of file.checkins) await repo.upsertCheckin({ projectId: file.project.id, date: c.d, status: c.s, value: c.v, note: c.n, updatedAt: c.u })
     }
     changed = true
   }
@@ -223,7 +223,7 @@ async function buildFile(p: Project, checkins: Checkin[]): Promise<ProjectFile> 
   return {
     version: 1,
     project: stripProject(p),
-    checkins: checkins.map(c => [c.date, c.status, c.value, c.note, c.updatedAt]),
+    checkins: checkins.map(c => ({ d: c.date, s: c.status, v: c.value, n: c.note, u: c.updatedAt })),
   }
 }
 

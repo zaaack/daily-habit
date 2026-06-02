@@ -65,7 +65,7 @@ export function Settings() {
       data.push({
         version: 1,
         project,
-        checkins: cs.map(c => [c.date, c.status, c.value, c.note, c.updatedAt]),
+        checkins: cs.map(c => ({ d: c.date, s: c.status, v: c.value, n: c.note, u: c.updatedAt })),
       })
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -90,7 +90,7 @@ export function Settings() {
         if (!item.project?.id) continue
         await repo.upsertProject({ ...item.project, remoteEtag: null, remotePath: makeRemotePath(item.project.id) })
         for (const c of item.checkins) {
-          await repo.upsertCheckin({ projectId: item.project.id, date: c[0], status: c[1], value: c[2], note: c[3], updatedAt: c[4] })
+          await repo.upsertCheckin({ projectId: item.project.id, date: c.d, status: c.s, value: c.v, note: c.n, updatedAt: c.u })
         }
       }
       const projects = await repo.listProjects()

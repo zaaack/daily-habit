@@ -3,7 +3,7 @@ import type { Project, Checkin, CheckStatus, ConflictItem } from '@/db/types'
 export interface ProjectFile {
   version: number
   project: Omit<Project, 'remoteEtag'>
-  checkins: [string, CheckStatus, number | null, string | null, number][]
+  checkins: { d: string; s: CheckStatus; v: number | null; n: string | null; u: number }[]
 }
 
 export interface MergeResult {
@@ -28,13 +28,13 @@ export function mergeProjectFile(
   localCheckins: Checkin[],
   remote: ProjectFile,
 ): MergeResult {
-  const remoteCheckins: Checkin[] = remote.checkins.map(t => ({
+  const remoteCheckins: Checkin[] = remote.checkins.map(c => ({
     projectId: remote.project.id,
-    date: t[0],
-    status: t[1],
-    value: t[2],
-    note: t[3],
-    updatedAt: t[4],
+    date: c.d,
+    status: c.s,
+    value: c.v,
+    note: c.n,
+    updatedAt: c.u,
   }))
   const conflicts: ConflictItem[] = []
   let project = local
