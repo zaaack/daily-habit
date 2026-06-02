@@ -43,7 +43,6 @@
   .card {
     @apply rounded-2xl border backdrop-blur p-3;
     background-color: rgb(var(--c-slate-900) / 0.7);
-    border-color: rgb(var(--c-slate-800) / 1);
   }
   .btn {
     @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition active:scale-95 disabled:opacity-50 disabled:pointer-events-none;

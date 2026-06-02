@@ -63,7 +63,7 @@ export function Home() {
                 key={'dow-' + d}
                 className={cn(
                   'text-center',
-                  isToday ? 'font-bold text-slate-950' : isFuture ? 'text-slate-500' : 'text-slate-400',
+                  isToday ? 'font-bold text-black-950' : isFuture ? 'text-black-300' : 'text-black-400',
                 )}
               >
                 {'日一二三四五六'[dow]}
