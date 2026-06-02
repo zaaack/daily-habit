@@ -125,6 +125,7 @@
     "monthlyAvg": "Monthly Avg"
   },
   "common": {
-    "dow": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    "dow": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    "done": "Done"
   }
 }

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, GripVertical } from 'lucide-react'
 import { useAppStore } from '@/state/useAppStore'
 import { StatusCell } from './StatusCell'
 import type { Project, Checkin } from '@/db/types'
 import { todayStr } from '@/db/schema'
 import { cn } from '@/lib/cn'
 
-export function ProjectCard({ project, dates }: { project: Project; dates: string[] }) {
+export function ProjectCard({ project, dates, sorting }: { project: Project; dates: string[]; sorting?: boolean }) {
   const cycle = useAppStore(s => s.cycleCheckin)
   const [checkins, setCheckins] = useState<Checkin[]>([])
   const [tick, setTick] = useState(0)
@@ -27,6 +27,19 @@ export function ProjectCard({ project, dates }: { project: Project; dates: strin
 
   const byDate = new Map(checkins.map(c => [c.date, c]))
   const today = todayStr()
+
+  if (sorting) {
+    return (
+      <div className="card flex items-center gap-2">
+        <GripVertical size={18} className="text-slate-500 shrink-0" />
+        <span className="h-7 w-7 grid place-items-center rounded text-base shrink-0" style={{ background: project.color + '33' }}>
+          {project.emoji}
+        </span>
+        <div className="font-medium text-slate-200 truncate">{project.name}</div>
+        {project.unit && <div className="text-xs text-slate-500 truncate">· {project.unit}</div>}
+      </div>
+    )
+  }
 
   return (
     <div className="card">

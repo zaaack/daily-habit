@@ -4,6 +4,18 @@ import type { Project, Checkin, SyncState, CheckStatus } from '@/db/types'
 import { runFullSync, syncOneProject } from '@/sync/fullSync'
 import type { ConflictItem } from '@/db/types'
 
+function sortByOrder(projects: Project[], order: string[] | null): Project[] {
+  if (!order || order.length === 0) return projects
+  const map = new Map(projects.map(p => [p.id, p]))
+  const sorted: Project[] = []
+  for (const id of order) {
+    const p = map.get(id)
+    if (p) { sorted.push(p); map.delete(id) }
+  }
+  for (const p of map.values()) sorted.push(p)
+  return sorted
+}
+
 interface AppState {
   ready: boolean
   projects: Project[]
@@ -20,6 +32,7 @@ interface AppState {
   setCheckin(projectId: string, date: string, status: CheckStatus | null, value: number | null, note: string | null): Promise<void>
 
   triggerSync(): Promise<void>
+  reorderProjects(orderedIds: string[]): Promise<void>
   resolveConflict(projectId: string, items: ConflictItem[]): Promise<void>
   clearConflict(projectId: string): Promise<void>
 }
@@ -36,8 +49,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       const lastSyncAt = await repo.getKV<number>('sync.lastAt')
       const lastSyncErr = await repo.getKV<string>('sync.lastError')
       const projects = await repo.listProjects()
+      const order = await repo.getKV<string[]>('projectOrder')
       set({
-        projects,
+        projects: sortByOrder(projects, order),
         sync: {
           status: lastSyncErr ? 'error' : 'ok',
           at: lastSyncAt ?? null,
@@ -142,7 +156,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           set(s => ({ conflicts: { ...s.conflicts, [projectId]: items } }))
         },
         onProjectsChange: (projects) => {
-          set({ projects })
+          repo.getKV<string[]>('projectOrder').then(order => {
+            set({ projects: sortByOrder(projects, order) })
+          })
         },
       })
       const at = nowMs()
@@ -154,6 +170,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       await repo.setKV('sync.lastError', msg)
       set(s => ({ sync: { ...s.sync, status: 'error', error: msg, pending: Math.max(0, s.sync.pending - 1) } }))
     }
+  },
+
+  async reorderProjects(orderedIds) {
+    const repo = await getRepo()
+    await repo.setKV('projectOrder', orderedIds)
+    set(s => ({ projects: sortByOrder(s.projects, orderedIds) }))
   },
 
   async resolveConflict(projectId, items) {
