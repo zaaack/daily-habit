@@ -11,6 +11,7 @@ interface Props {
   unit?: string | null
   color: string
   compact?: boolean
+  disabled?: boolean
   refreshKey?: number
   onCycle: () => void
 }
@@ -21,7 +22,7 @@ function nextStatus(cur: CheckStatus | undefined): CheckStatus | null {
   return null
 }
 
-export function StatusCell({ projectId, date, checkin, unit, color, compact, refreshKey, onCycle }: Props) {
+export function StatusCell({ projectId, date, checkin, unit, color, compact, disabled, refreshKey, onCycle }: Props) {
   const [open, setOpen] = useState(false)
   const [optimistic, setOptimistic] = useState<CheckStatus | null | undefined>(undefined)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -55,7 +56,8 @@ export function StatusCell({ projectId, date, checkin, unit, color, compact, ref
   return (
     <>
       <button
-        className={cn(base, sizeCls, todayCls, status ? '' : defaultCls)}
+        className={cn(base, sizeCls, todayCls, status ? '' : defaultCls, disabled && 'pointer-events-none')}
+        disabled={disabled}
         style={
           status === 'success'
             ? { background: color, borderColor: color, color: '#020617' }

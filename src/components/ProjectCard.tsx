@@ -59,6 +59,7 @@ export function ProjectCard({ project, dates }: { project: Project; dates: strin
                 unit={project.unit}
                 color={project.color}
                 compact
+                disabled={isFuture}
                 refreshKey={tick}
                 onCycle={() => void cycle(project.id, d)}
               />
