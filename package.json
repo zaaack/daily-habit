@@ -4,6 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
+    "preversion": "pnpm build",
     "dev": "vite",
     "build": "node scripts/generate-icons.mjs && tsc -b && vite build",
     "build:cf": "VITE_BASE_URL=/ pnpm build",

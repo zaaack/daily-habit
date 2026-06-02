@@ -182,11 +182,12 @@ export function Settings() {
       await repo.upsertProject({
         id,
         name,
-        description: habit.desc,
+        description: habit.desc as string,
         unit: (habit.daily_goal_unit as string) || null,
         emoji: '📌',
         color: PROJECT_COLORS[colorIdx],
         sort: 0,
+        archived: 0,
         createdAt: ((habit.create_t as number) ?? Math.floor(now / 1000)) * 1000,
         updatedAt: ((habit.modify_t as number) ?? Math.floor(now / 1000)) * 1000,
         remoteEtag: null,

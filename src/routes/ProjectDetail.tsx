@@ -83,7 +83,7 @@ export function ProjectDetail() {
   const [pageH, setPageH] = useState(0)
   const currRef = useRef<HTMLDivElement>(null)
   const calendarRef = useRef<HTMLDivElement>(null)
-  const wheelTimer = useRef<ReturnType<typeof setTimeout>>()
+  const wheelTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const pages = useMemo(() => ({
     prev: buildPage(pageNum - 1),
