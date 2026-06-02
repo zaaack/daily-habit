@@ -1,0 +1,226 @@
+webview | Tauri
+https://v2.tauri.app/reference/javascript/api/namespacewebview/
+
+<!DOCTYPE html> webview | Tauri
+
+Skip to content 
+
+Tauri MenuGuidesReferencesBlogReleases 
+
+Search CtrlK 
+Cancel 
+
+Guides References Blog Releases 
+
+GitHubDiscordTwitterBlueskyMastodonRSS 
+Select language EnglishFrançaisEspañol简体中文日本語한국어 
+
+webview
+
+Provides APIs to create webviews, communicate with other webviews and manipulate the current webview.
+
+Webview events
+Section titled “Webview events”
+
+Events can be listened to using Webview.listen:
+
+<code><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">import</span><span style="--0:#D6DEEB;--1:#403F53"> { getCurrentWebview } </span><span style="--0:#C792EA;--1:#8844AE">from</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">@tauri-apps/api/webview</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">;</span></div></div><div class="ec-line"><div class="code"><span style="--0:#82AAFF;--1:#3B61B0">getCurrentWebview</span><span style="--0:#D6DEEB;--1:#403F53">()</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">listen</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">my-webview-event</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">, </span><span style="--0:#D9F5DD;--1:#111111">(</span><span style="--1:#403F53"><span style="--0:#D6DEEB">{ </span><span style="--0:#D7DBE0">event</span><span style="--0:#D6DEEB">, </span><span style="--0:#D7DBE0">payload</span><span style="--0:#D6DEEB"> }</span></span><span style="--0:#D9F5DD;--1:#111111">)</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#C792EA;--1:#8844AE">=></span><span style="--0:#D6DEEB;--1:#403F53"> { });</span></div></div></code>
+
+Classes
+Section titled “Classes”
+
+Webview
+Section titled “Webview”
+
+Create new webview or get a handle to an existing one.
+
+Webviews are identified by a label a unique identifier that can be used to reference it later.
+It may only contain alphanumeric characters a-zA-Z plus the following special characters -, /, : and _.
+
+Example
+Section titled “Example”
+
+<code><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">import</span><span style="--0:#D6DEEB;--1:#403F53"> { Window } </span><span style="--0:#C792EA;--1:#8844AE">from</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">@tauri-apps/api/window</span><span style="--0:#D9F5DD;--1:#111111">"</span></div></div><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">import</span><span style="--0:#D6DEEB;--1:#403F53"> { Webview } </span><span style="--0:#C792EA;--1:#8844AE">from</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">@tauri-apps/api/webview</span><span style="--0:#D9F5DD;--1:#111111">"</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">const </span><span style="--0:#82AAFF;--1:#3B61B0">appWindow</span><span style="--0:#C792EA;--1:#8844AE"> = </span><span style="--0:#7FDBCA;--1:#096E72">new</span><span style="--0:#C792EA;--1:#8844AE"> </span><span style="--0:#82AAFF;--1:#3B61B0">Window</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">uniqueLabel</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#D6DEEB;--1:#403F53">);</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span style="--0:#D6DEEB;--1:#403F53">appWindow</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">once</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">tauri://created</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#D6DEEB;--1:#403F53">, </span><span style="--0:#C792EA;--1:#8844AE">async</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#C792EA;--1:#8844AE">function</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#D9F5DD;--1:#111111">()</span><span style="--0:#D6DEEB;--1:#403F53"> {</span></div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#919F9F;--1:#5D6376">// `new Webview` Should be called after the window is successfully created,</span></div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#919F9F;--1:#5D6376">// or webview may not be attached to the window since window is not created yet.</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#919F9F;--1:#5D6376">// loading embedded asset:</span></div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#C792EA;--1:#8844AE">const </span><span style="--0:#82AAFF;--1:#3B61B0">webview</span><span style="--0:#C792EA;--1:#8844AE"> = </span><span style="--0:#7FDBCA;--1:#096E72">new</span><span style="--0:#C792EA;--1:#8844AE"> </span><span style="--0:#82AAFF;--1:#3B61B0">Webview</span><span style="--0:#D6DEEB;--1:#403F53">(appWindow</span><span style="--0:#889FB2;--1:#4D667B">,</span><span style="--0:#C792EA;--1:#8844AE"> </span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">theUniqueLabel</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#889FB2;--1:#4D667B">,</span><span style="--0:#C792EA;--1:#8844AE"> {</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">url: </span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">path/to/page.html</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#889FB2;--1:#4D667B">,</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#919F9F;--1:#5D6376">// create a webview with specific logical position and size</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">x: </span><span style="--0:#F78C6C;--1:#AA0982">0</span><span style="--0:#889FB2;--1:#4D667B">,</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">y: </span><span style="--0:#F78C6C;--1:#AA0982">0</span><span style="--0:#889FB2;--1:#4D667B">,</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">width: </span><span style="--0:#F78C6C;--1:#AA0982">800</span><span style="--0:#889FB2;--1:#4D667B">,</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">height: </span><span style="--0:#F78C6C;--1:#AA0982">600</span><span style="--0:#889FB2;--1:#4D667B">,</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">}</span><span style="--0:#D6DEEB;--1:#403F53">);</span></div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#919F9F;--1:#5D6376">// alternatively, load a remote URL:</span></div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#C792EA;--1:#8844AE">const </span><span style="--0:#82AAFF;--1:#3B61B0">webview</span><span style="--0:#C792EA;--1:#8844AE"> = </span><span style="--0:#7FDBCA;--1:#096E72">new</span><span style="--0:#C792EA;--1:#8844AE"> </span><span style="--0:#82AAFF;--1:#3B61B0">Webview</span><span style="--0:#D6DEEB;--1:#403F53">(appWindow</span><span style="--0:#889FB2;--1:#4D667B">,</span><span style="--0:#C792EA;--1:#8844AE"> </span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">theUniqueLabel</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#889FB2;--1:#4D667B">,</span><span style="--0:#C792EA;--1:#8844AE"> {</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">url: </span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">https://github.com/tauri-apps/tauri</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#889FB2;--1:#4D667B">,</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#919F9F;--1:#5D6376">// create a webview with specific logical position and size</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">x: </span><span style="--0:#F78C6C;--1:#AA0982">0</span><span style="--0:#889FB2;--1:#4D667B">,</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">y: </span><span style="--0:#F78C6C;--1:#AA0982">0</span><span style="--0:#889FB2;--1:#4D667B">,</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">width: </span><span style="--0:#F78C6C;--1:#AA0982">800</span><span style="--0:#889FB2;--1:#4D667B">,</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">height: </span><span style="--0:#F78C6C;--1:#AA0982">600</span><span style="--0:#889FB2;--1:#4D667B">,</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">}</span><span style="--0:#D6DEEB;--1:#403F53">);</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#D6DEEB;--1:#403F53"> </span></span><span style="--0:#D6DEEB;--1:#403F53">webview</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">once</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">tauri://created</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#889FB2;--1:#4D667B">,</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#C792EA;--1:#8844AE">function</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#D9F5DD;--1:#111111">()</span><span style="--0:#D6DEEB;--1:#403F53"> {</span></div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#919F9F;--1:#5D6376">// webview successfully created</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#D6DEEB;--1:#403F53"> </span></span><span style="--0:#D6DEEB;--1:#403F53">});</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#D6DEEB;--1:#403F53"> </span></span><span style="--0:#D6DEEB;--1:#403F53">webview</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">once</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">tauri://error</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#889FB2;--1:#4D667B">,</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#C792EA;--1:#8844AE">function</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#D9F5DD;--1:#111111">(</span><span style="--0:#D7DBE0;--1:#403F53">e</span><span style="--0:#D9F5DD;--1:#111111">)</span><span style="--0:#D6DEEB;--1:#403F53"> {</span></div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#919F9F;--1:#5D6376">// an error happened creating the webview</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#D6DEEB;--1:#403F53"> </span></span><span style="--0:#D6DEEB;--1:#403F53">});</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#919F9F;--1:#5D6376">// emit an event to the backend</span></div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#C792EA;--1:#8844AE">await</span><span style="--0:#D6DEEB;--1:#403F53"> webview</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">emit</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">some-event</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#889FB2;--1:#4D667B">,</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">data</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">);</span></div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#919F9F;--1:#5D6376">// listen to an event from the backend</span></div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#C792EA;--1:#8844AE">const </span><span style="--0:#82AAFF;--1:#3B61B0">unlisten</span><span style="--0:#C792EA;--1:#8844AE"> = await </span><span style="--0:#D6DEEB;--1:#403F53">webview</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">listen</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#ECC48D;--1:#984E4D">event-name</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#889FB2;--1:#4D667B">,</span><span style="--0:#C792EA;--1:#8844AE"> </span><span style="--0:#D7DBE0;--1:#403F53">e</span><span style="--0:#C792EA;--1:#8844AE"> => { }</span><span style="--0:#D6DEEB;--1:#403F53">);</span></div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#82AAFF;--1:#3B61B0">unlisten</span><span style="--0:#D6DEEB;--1:#403F53">();</span></div></div><div class="ec-line"><div class="code"><span style="--0:#D6DEEB;--1:#403F53">});</span></div></div></code>
+
+Since
+Section titled “Since”
+
+2.0.0
+
+Extended by
+Section titled “Extended by”
+
+WebviewWindow
+
+Constructors
+Section titled “Constructors”
+
+new Webview()
+Section titled “new Webview()”
+
+<code><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#096E72">new</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#82AAFF;--1:#3B61B0">Webview</span><span style="--0:#D6DEEB;--1:#403F53">(</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#D6DEEB;--1:#403F53"> </span></span><span style="--0:#D6DEEB;--1:#403F53">window,</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#D6DEEB;--1:#403F53"> </span></span><span style="--0:#D6DEEB;--1:#403F53">label,</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#D6DEEB;--1:#403F53"> </span></span><span style="--0:#D6DEEB;--1:#403F53">options): Webview</span></div></div></code>
+
+Creates a new Webview.
+
+Parameters
+Section titled “Parameters”
+
+ParameterTypeDescription
+
+windowWindowthe window to add this webview to.
+
+labelstringThe unique webview label. Must be alphanumeric: a-zA-Z-/:_.
+
+optionsWebviewOptions-
+
+Returns
+Section titled “Returns”
+
+Webview
+
+The Webview instance to communicate with the webview.
+
+Example
+Section titled “Example”
+
+<code><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">import</span><span style="--0:#D6DEEB;--1:#403F53"> { Window } </span><span style="--0:#C792EA;--1:#8844AE">from</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">@tauri-apps/api/window</span><span style="--0:#D9F5DD;--1:#111111">'</span></div></div><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">import</span><span style="--0:#D6DEEB;--1:#403F53"> { Webview } </span><span style="--0:#C792EA;--1:#8844AE">from</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">@tauri-apps/api/webview</span><span style="--0:#D9F5DD;--1:#111111">'</span></div></div><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">const </span><span style="--0:#82AAFF;--1:#3B61B0">appWindow</span><span style="--0:#C792EA;--1:#8844AE"> = </span><span style="--0:#7FDBCA;--1:#096E72">new</span><span style="--0:#C792EA;--1:#8844AE"> </span><span style="--0:#82AAFF;--1:#3B61B0">Window</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">my-label</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#D6DEEB;--1:#403F53">)</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span style="--0:#D6DEEB;--1:#403F53">appWindow</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">once</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">tauri://created</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#D6DEEB;--1:#403F53">, </span><span style="--0:#C792EA;--1:#8844AE">async</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#C792EA;--1:#8844AE">function</span><span style="--0:#D9F5DD;--1:#111111">()</span><span style="--0:#D6DEEB;--1:#403F53"> {</span></div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#C792EA;--1:#8844AE">const </span><span style="--0:#82AAFF;--1:#3B61B0">webview</span><span style="--0:#C792EA;--1:#8844AE"> = </span><span style="--0:#7FDBCA;--1:#096E72">new</span><span style="--0:#C792EA;--1:#8844AE"> </span><span style="--0:#82AAFF;--1:#3B61B0">Webview</span><span style="--0:#D6DEEB;--1:#403F53">(appWindow</span><span style="--0:#889FB2;--1:#4D667B">,</span><span style="--0:#C792EA;--1:#8844AE"> </span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">my-label</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#889FB2;--1:#4D667B">,</span><span style="--0:#C792EA;--1:#8844AE"> {</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">url: </span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">https://github.com/tauri-apps/tauri</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#889FB2;--1:#4D667B">,</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#919F9F;--1:#5D6376">// create a webview with specific logical position and size</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">x: </span><span style="--0:#F78C6C;--1:#AA0982">0</span><span style="--0:#889FB2;--1:#4D667B">,</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">y: </span><span style="--0:#F78C6C;--1:#AA0982">0</span><span style="--0:#889FB2;--1:#4D667B">,</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">width: </span><span style="--0:#F78C6C;--1:#AA0982">800</span><span style="--0:#889FB2;--1:#4D667B">,</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">height: </span><span style="--0:#F78C6C;--1:#AA0982">600</span><span style="--0:#889FB2;--1:#4D667B">,</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#C792EA;--1:#8844AE"> </span></span><span style="--0:#C792EA;--1:#8844AE">}</span><span style="--0:#D6DEEB;--1:#403F53">);</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#D6DEEB;--1:#403F53"> </span></span><span style="--0:#D6DEEB;--1:#403F53">webview</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">once</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">tauri://created</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#889FB2;--1:#4D667B">,</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#C792EA;--1:#8844AE">function</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#D9F5DD;--1:#111111">()</span><span style="--0:#D6DEEB;--1:#403F53"> {</span></div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#919F9F;--1:#5D6376">// webview successfully created</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#D6DEEB;--1:#403F53"> </span></span><span style="--0:#D6DEEB;--1:#403F53">});</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#D6DEEB;--1:#403F53"> </span></span><span style="--0:#D6DEEB;--1:#403F53">webview</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">once</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">tauri://error</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#889FB2;--1:#4D667B">,</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#C792EA;--1:#8844AE">function</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#D9F5DD;--1:#111111">(</span><span style="--0:#D7DBE0;--1:#403F53">e</span><span style="--0:#D9F5DD;--1:#111111">)</span><span style="--0:#D6DEEB;--1:#403F53"> {</span></div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#919F9F;--1:#5D6376">// an error happened creating the webview</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#D6DEEB;--1:#403F53"> </span></span><span style="--0:#D6DEEB;--1:#403F53">});</span></div></div><div class="ec-line"><div class="code"><span style="--0:#D6DEEB;--1:#403F53">});</span></div></div></code>
+
+Source: https://github.com/tauri-apps/tauri/blob/dev/packages/api/src/webview.ts#L194
+
+Properties
+Section titled “Properties”
+
+PropertyTypeDescriptionDefined in
+
+labelstringThe webview label. It is a unique identifier for the webview, can be used to reference it later.Source: https://github.com/tauri-apps/tauri/blob/dev/packages/api/src/webview.ts#L155
+
+listenersRecord<string, EventCallback<any>[]>Local event listeners.Source: https://github.com/tauri-apps/tauri/blob/dev/packages/api/src/webview.ts#L160
+
+windowWindowThe window hosting this webview.Source: https://github.com/tauri-apps/tauri/blob/dev/packages/api/src/webview.ts#L157
+
+Methods
+Section titled “Methods”
+
+clearAllBrowsingData()
+Section titled “clearAllBrowsingData()”
+
+<code><div class="ec-line"><div class="code"><span style="--0:#82AAFF;--1:#3B61B0">clearAllBrowsingData</span><span style="--0:#D6DEEB;--1:#403F53">(): </span><span style="--0:#C5E478;--1:#3B61B0">Promise</span><span style="--0:#C792EA;--1:#8844AE"><</span><span style="--0:#7FDBCA;--1:#096E72">void</span><span style="--0:#C792EA;--1:#8844AE">></span></div></div></code>
+
+Clears all browsing data for this webview.
+
+Returns
+Section titled “Returns”
+
+Promise<void>
+
+A promise indicating the success or failure of the operation.
+
+Example
+Section titled “Example”
+
+<code><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">import</span><span style="--0:#D6DEEB;--1:#403F53"> { getCurrentWebview } </span><span style="--0:#C792EA;--1:#8844AE">from</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">@tauri-apps/api/webview</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#D6DEEB;--1:#403F53">;</span></div></div><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">await</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#82AAFF;--1:#3B61B0">getCurrentWebview</span><span style="--0:#D6DEEB;--1:#403F53">()</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">clearAllBrowsingData</span><span style="--0:#D6DEEB;--1:#403F53">();</span></div></div></code>
+
+Source: https://github.com/tauri-apps/tauri/blob/dev/packages/api/src/webview.ts#L589
+
+close()
+Section titled “close()”
+
+<code><div class="ec-line"><div class="code"><span style="--0:#82AAFF;--1:#3B61B0">close</span><span style="--0:#D6DEEB;--1:#403F53">(): </span><span style="--0:#C5E478;--1:#3B61B0">Promise</span><span style="--0:#C792EA;--1:#8844AE"><</span><span style="--0:#7FDBCA;--1:#096E72">void</span><span style="--0:#C792EA;--1:#8844AE">></span></div></div></code>
+
+Closes the webview.
+
+Returns
+Section titled “Returns”
+
+Promise<void>
+
+A promise indicating the success or failure of the operation.
+
+Example
+Section titled “Example”
+
+<code><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">import</span><span style="--0:#D6DEEB;--1:#403F53"> { getCurrentWebview } </span><span style="--0:#C792EA;--1:#8844AE">from</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">@tauri-apps/api/webview</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#D6DEEB;--1:#403F53">;</span></div></div><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">await</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#82AAFF;--1:#3B61B0">getCurrentWebview</span><span style="--0:#D6DEEB;--1:#403F53">()</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">close</span><span style="--0:#D6DEEB;--1:#403F53">();</span></div></div></code>
+
+Source: https://github.com/tauri-apps/tauri/blob/dev/packages/api/src/webview.ts#L436
+
+emit()
+Section titled “emit()”
+
+<code><div class="ec-line"><div class="code"><span style="--0:#82AAFF;--1:#3B61B0">emit</span><span style="--0:#D6DEEB;--1:#403F53"><</span><span style="--0:#FFCB8B;--1:#111111">T</span><span style="--0:#D6DEEB;--1:#403F53">>(event, payload</span><span style="--0:#C792EA;--1:#8844AE">?</span><span style="--0:#D6DEEB;--1:#403F53">)</span><span style="--0:#C792EA;--1:#8844AE">:</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#C5E478;--1:#3B61B0">Promise</span><span style="--0:#C792EA;--1:#8844AE"><</span><span style="--0:#7FDBCA;--1:#096E72">void</span><span style="--0:#C792EA;--1:#8844AE">></span></div></div></code>
+
+Emits an event to all targets.
+
+Type Parameters
+Section titled “Type Parameters”
+
+Type Parameter
+
+T
+
+Parameters
+Section titled “Parameters”
+
+ParameterTypeDescription
+
+eventstringEvent name. Must include only alphanumeric characters, -, /, : and _.
+
+payload?TEvent payload.
+
+Returns
+Section titled “Returns”
+
+Promise<void>
+
+Example
+Section titled “Example”
+
+<code><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">import</span><span style="--0:#D6DEEB;--1:#403F53"> { getCurrentWebview } </span><span style="--0:#C792EA;--1:#8844AE">from</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">@tauri-apps/api/webview</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#D6DEEB;--1:#403F53">;</span></div></div><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">await</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#82AAFF;--1:#3B61B0">getCurrentWebview</span><span style="--0:#D6DEEB;--1:#403F53">()</span><span style="--0:#C792EA;--1:#8844AE">.</span><span style="--0:#82AAFF;--1:#3B61B0">emit</span><span style="--0:#D6DEEB;--1:#403F53">(</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">webview-loaded</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#D6DEEB;--1:#403F53">, { loggedIn: </span><span style="--0:#FF6A83;--1:#A24848">true</span><span style="--0:#D6DEEB;--1:#403F53">, token: </span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#ECC48D;--1:#984E4D">authToken</span><span style="--0:#D9F5DD;--1:#111111">'</span><span style="--0:#D6DEEB;--1:#403F53"> });</span></div></div></code>
+
+Source: https://github.com/tauri-apps/tauri/blob/dev/packages/api/src/webview.ts#L325
+
+emitTo()
+Section titled “emitTo()”
+
+<code><div class="ec-line"><div class="code"><span style="--0:#82AAFF;--1:#3B61B0">emitTo</span><span style="--0:#D6DEEB;--1:#403F53"><</span><span style="--0:#FFCB8B;--1:#111111">T</span><span style="--0:#D6DEEB;--1:#403F53">>(</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#D6DEEB;--1:#403F53"> </span></span><span style="--0:#D6DEEB;--1:#403F53">target,</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#D6DEEB;--1:#403F53"> </span></span><span style="--0:#D6DEEB;--1:#403F53">event,</span></div></div><div class="ec-line"><div class="code"><span style="--0:#D6DEEB;--1:#403F53">payload</span><span style="--0:#C792EA;--1:#8844AE">?</span><span style="--0:#D6DEEB;--1:#403F53">)</span><span style="--0:#C792EA;--1:#8844AE">:</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#C5E478;--1:#3B61B0">Promise</span><span style="--0:#C792EA;--1:#8844AE"><</span><span style="--0:#7FDBCA;--1:#096E72">void</span><span style="--0:#C792EA;--1:#8844AE">></span></div></div></code>
+
+Emits an event to all targets matching the given target.
+
+Type Parameters
+Section titled “Type Parameters”
+
+Type Parameter
+
+T
+
+Parameters
+Section titled “Parameters”
+
+ParameterTypeDescription
+
+targetstring | EventTargetLabel of the target Window/Webview/WebviewWindow or raw EventTarget object.
+
+eventstringEvent name. Must include only alphanumeric characters, -, /, : and _.
+
+payload?TEvent payload.
+
+Returns
+Section titled “Returns”
+
+Promise<void>
+
+Example
+Section titled “Example”
+
+<code><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">import</span><span style="--0:#D6DEEB;--1:#403F53"> { getCurrentWebview } </span><span style="--0:#C792EA;--1:#8844AE">from</span><span style="--0:#D6DEEB;--1:#403F53"> </
+
+[… truncated 49374 chars …]
