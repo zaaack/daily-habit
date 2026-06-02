@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { RouterProvider, createMemoryRouter } from 'react-router-dom'
+import { RouterProvider, createHashRouter } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
 import { Home } from '@/routes/Home'
@@ -10,7 +10,7 @@ import { NotFound } from '@/routes/NotFound'
 import { Layout } from '@/components/Layout'
 import { ConflictDialog } from '@/components/ConflictDialog'
 
-const router = createMemoryRouter([
+const router = createHashRouter([
   {
     path: '/',
     element: <Layout />,
