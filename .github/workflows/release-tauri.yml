@@ -128,8 +128,8 @@ jobs:
             echo "ANDROID_NDK_HOME=${NDK_DIR%/}" >> "$GITHUB_ENV"
           fi
 
-      - name: Build Android (ARM APK + AAB)
-        run: pnpm tauri android build --target aarch64 --target armv7
+      - name: Build Android (ARM APK)
+        run: pnpm tauri android build --target aarch64 --target armv7 --debug
 
       - name: Upload artifacts to Release
         uses: actions/github-script@v7
@@ -141,8 +141,7 @@ jobs:
             const path = require('path');
 
             const dirs = [
-              'src-tauri/gen/android/app/build/outputs/apk',
-              'src-tauri/gen/android/app/build/outputs/bundle',
+              'src-tauri/gen/android/app/build/outputs/apk/debug',
             ];
             const files = [];
 
