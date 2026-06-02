@@ -91,7 +91,7 @@ jobs:
 
   # ── Desktop (Linux / macOS / Windows) ───────────────────────────────
   build-desktop:
-    if: github.event_name == 'push' || contains(github.event.inputs.targets || '', matrix.target)
+    if: github.event_name == 'push' || github.event.inputs.targets != ''
     strategy:
       fail-fast: false
       matrix:
