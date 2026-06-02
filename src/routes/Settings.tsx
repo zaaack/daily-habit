@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
-import { getSyncConfig, setSyncConfig, testConnection, syncOneProject, makeRemotePath, cleanupDeletedProjects } from '@/sync/fullSync'
+import { getSyncConfig, setSyncConfig, testConnection, makeRemotePath, cleanupDeletedProjects } from '@/sync/fullSync'
 import type { WebDavConfig } from '@/sync/webdav'
 import { epochDayToDateStr, type ReadableProjectFile } from '@/sync/merge'
 import type { Checkin } from '@/db/types'
@@ -132,7 +132,6 @@ export function Settings() {
       }
       const projects = await repo.listProjects()
       useAppStore.setState({ projects })
-      for (const p of projects) void syncOneProject(p.id).catch(() => {})
       await useAppStore.getState().triggerSync()
       setImporting(null)
       if (useAppStore.getState().sync.status === 'error') {
@@ -224,7 +223,6 @@ export function Settings() {
     }
     const projects = await repo.listProjects()
     useAppStore.setState({ projects })
-    for (const p of projects) void syncOneProject(p.id).catch(() => {})
     await useAppStore.getState().triggerSync()
     setImporting(null)
     if (useAppStore.getState().sync.status === 'error') {

@@ -143,9 +143,11 @@ export async function runFullSync(
       remoteByPath.delete(filename)
       continue
     }
+    // 重新读取本地最新数据（防止并发导入等修改导致使用过期快照）
+    const freshProject = await repo.getProject(p.id) ?? p
     const localCheckins = await repo.getCheckinsAll(p.id)
     const { project, checkinsAll: mergedAll, conflicts, changed: merged } = mergeProjectFile(
-      stripProject(p), localCheckins, file,
+      stripProject(freshProject), localCheckins, file,
     )
 
     if (conflicts.length > 0) {
@@ -154,7 +156,7 @@ export async function runFullSync(
 
     if (merged) {
       const nextProject: Omit<Project, 'remoteEtag'> = { ...project, remotePath: p.remotePath }
-      await repo.upsertProject({ ...p, ...nextProject, remoteEtag })
+      await repo.upsertProject({ ...freshProject, ...nextProject, remoteEtag })
 
       // 合并: merge 结果(含 tombstone) + 本地-only
       const mergedDates = new Set(mergedAll.map(c => c.date))
@@ -165,14 +167,14 @@ export async function runFullSync(
 
       // 重新上传完整文件 (mergedAll 已含 tombstone + 本地-only)
       try {
-        const uploadFile = await buildFile({ ...p, ...nextProject }, mergedAll)
+        const uploadFile = await buildFile({ ...freshProject, ...nextProject }, mergedAll)
         await client.putFileContents(p.remotePath, JSON.stringify(uploadFile, null, 2), { contentLength: false })
         const newEtag = await getDirEntryEtag(client, p.remotePath)
-        if (newEtag) await repo.upsertProject({ ...p, ...nextProject, remoteEtag: newEtag })
+        if (newEtag) await repo.upsertProject({ ...freshProject, ...nextProject, remoteEtag: newEtag })
       } catch { /* 留待下次重试 */ }
       changed = true
     }
-    refreshedProjects.push({ ...p, remoteEtag })
+    refreshedProjects.push({ ...freshProject, remoteEtag })
     remoteByPath.delete(filename)
   }
 
@@ -278,28 +280,31 @@ export async function syncOneProject(projectId: string): Promise<void> {
     }
     return
   }
-  const { project, checkinsAll: mergedAll, conflicts } = mergeProjectFile(stripProject(p), localCheckins, remote)
+  // 重新读取本地最新数据（防止并发导入等修改导致使用过期快照）
+  const freshP = await repo.getProject(p.id) ?? p
+  const freshCheckins = await repo.getCheckinsAll(p.id)
+  const { project, checkinsAll: mergedAll, conflicts } = mergeProjectFile(stripProject(freshP), freshCheckins, remote)
   if (conflicts.length) {
     const { useAppStore } = await import('@/state/useAppStore')
     useAppStore.setState(s => ({ conflicts: { ...s.conflicts, [p.id]: conflicts } }))
   }
   if (conflicts.length === 0) {
-    await repo.upsertProject({ ...p, ...project, remoteEtag })
+    await repo.upsertProject({ ...freshP, ...project, remoteEtag })
 
     // 合并: merge 结果(含 tombstone) + 本地-only
     const mergedDates = new Set(mergedAll.map(c => c.date))
-    for (const c of localCheckins) {
+    for (const c of freshCheckins) {
       if (!mergedDates.has(c.date)) mergedAll.push(c)
     }
     for (const c of mergedAll) await repo.upsertCheckin(c)
 
     try {
-      const file = await buildFile({ ...p, ...project }, mergedAll)
+      const file = await buildFile({ ...freshP, ...project }, mergedAll)
       const res = await client.putFileContents(p.remotePath, JSON.stringify(file, null, 2), {
         contentLength: false,
       })
       const newEtag = await getDirEntryEtag(client, p.remotePath) ?? normalizeEtag(String(res))
-      await repo.upsertProject({ ...p, ...project, remoteEtag: newEtag })
+      await repo.upsertProject({ ...freshP, ...project, remoteEtag: newEtag })
     } catch (e) {
       console.warn('[sync] syncOneProject merge upload failed:', e)
       /* 412 等 — 留待 runFullSync 重试 */
