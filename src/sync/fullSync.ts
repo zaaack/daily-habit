@@ -416,4 +416,28 @@ export async function cleanupDeletedProjects(): Promise<{ cleaned: number } | nu
   return { cleaned }
 }
 
+/** 导入数据后直接上传到远端，设置 remoteEtag，避免后续 sync 走 merge 覆盖 */
+export async function uploadImportedProject(
+  project: Project,
+  checkins: Checkin[],
+): Promise<string | null> {
+  const cfg = getSyncConfig()
+  if (!cfg) return null
+  const client = await getClient(cfg)
+  const file: ProjectFile = {
+    version: 2,
+    project: stripProject(project),
+    checkins: checkins.map(checkinToCompact),
+  }
+  try {
+    await client.putFileContents(project.remotePath, JSON.stringify(file, null, 2), {
+      contentLength: false,
+    })
+    return await getDirEntryEtag(client, project.remotePath)
+  } catch (e) {
+    console.warn('[sync] uploadImportedProject failed:', e)
+    return null
+  }
+}
+
 export { makeRemotePath }

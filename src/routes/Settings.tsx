@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
-import { getSyncConfig, setSyncConfig, testConnection, makeRemotePath, cleanupDeletedProjects } from '@/sync/fullSync'
+import { getSyncConfig, setSyncConfig, testConnection, makeRemotePath, cleanupDeletedProjects, uploadImportedProject } from '@/sync/fullSync'
 import type { WebDavConfig } from '@/sync/webdav'
 import { epochDayToDateStr, type ReadableProjectFile } from '@/sync/merge'
 import type { Checkin } from '@/db/types'
@@ -110,23 +110,24 @@ export function Settings() {
         if (!item.project?.id) continue
         const now = Date.now()
         const { remoteEtag: _re, remotePath: _rp, ...proj } = item.project
-        await repo.upsertProject({ ...proj, updatedAt: now, remoteEtag: null, remotePath: makeRemotePath(item.project.id) })
+        const remotePath = makeRemotePath(item.project.id)
+        const project = { ...proj, updatedAt: now, remoteEtag: null, remotePath }
+        await repo.upsertProject(project)
         const checkins: Checkin[] = []
         for (const c of item.checkins ?? []) {
           if ('date' in c) {
-            // readable format: { date, status, value, note, updatedAt }
             checkins.push({ projectId: item.project.id, date: c.date, status: c.status, value: c.value, note: c.note, updatedAt: now })
           } else if (typeof c.d === 'number') {
-            // compact sync format: { d: epochDay, s: 0|1, ... }
             const { compactToCheckin } = await import('@/sync/merge')
             const ck = compactToCheckin(item.project.id, c)
             checkins.push({ ...ck, updatedAt: now })
           } else {
-            // old abbreviated format: { d: dateStr, s: 'success'|'fail', ... }
             checkins.push({ projectId: item.project.id, date: c.d, status: c.s, value: c.v, note: c.n, updatedAt: now })
           }
         }
         if (checkins.length > 0) await repo.bulkUpsertCheckins(checkins)
+        const etag = await uploadImportedProject(project, checkins)
+        if (etag) await repo.upsertProject({ ...project, remoteEtag: etag })
         processed++
         setImporting({ current: processed, total })
       }
@@ -178,7 +179,7 @@ export function Settings() {
       const colorIdx = Math.min(Math.max(((habit.color as number) ?? 1) - 1, 0), PROJECT_COLORS.length - 1)
 //  忽略非进行中项目      
       if (((habit.status as number) ?? 1) !== 1) continue
-      await repo.upsertProject({
+      const project = {
         id,
         name,
         description: habit.desc as string,
@@ -186,16 +187,17 @@ export function Settings() {
         emoji: '📌',
         color: PROJECT_COLORS[colorIdx],
         sort: 0,
-        archived: 0,
+        archived: 0 as const,
         createdAt: ((habit.create_t as number) ?? Math.floor(now / 1000)) * 1000,
         updatedAt: now,
         remoteEtag: null,
         remotePath: makeRemotePath(id, DEFAULT_REMOTE_DIR),
-        deleted: ((habit.status as number) ?? 1) === 1 ? 0 : 1,
-      })
+        deleted: (((habit.status as number) ?? 1) === 1 ? 0 : 1) as 0 | 1,
+      }
+      await repo.upsertProject(project)
       const records = (habit.records as unknown[]) ?? []
+      const checkins: Checkin[] = []
       if (records.length > 0) {
-        const checkins: Checkin[] = []
         for (const r of records) {
           const rec = r as Record<string, unknown>
           const recordDate = (rec.record_date as number) ?? 0
@@ -213,6 +215,8 @@ export function Settings() {
         }
         await repo.bulkUpsertCheckins(checkins)
       }
+      const etag = await uploadImportedProject(project, checkins)
+      if (etag) await repo.upsertProject({ ...project, remoteEtag: etag })
       processed++
       setImporting({ current: processed, total })
     }
