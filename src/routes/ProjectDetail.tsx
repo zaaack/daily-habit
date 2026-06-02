@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ChevronLeft, ChevronDown, RotateCcw, Settings as SettingsIcon } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, RotateCcw, Settings as SettingsIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
 import { todayStr } from '@/db/schema'
@@ -213,7 +213,7 @@ export function ProjectDetail() {
       </div>
 
       <div className="card">
-        <div className="relative mb-2">
+        <div className="relative mb-2 flex items-center justify-between">
           <button
             className="flex items-center gap-1 text-sm font-semibold text-slate-200 hover:text-brand-500"
             onClick={() => setPickerOpen(v => !v)}
@@ -221,6 +221,14 @@ export function ProjectDetail() {
             {t('project.yearMonth', { year: viewYear, month: viewMonth })}
             <ChevronDown size={14} className={cn('transition-transform', pickerOpen && 'rotate-180')} />
           </button>
+          <div className="flex items-center gap-1">
+            <button className="btn-ghost p-1" onClick={() => setPageNum(p => p - 1)} aria-label="previous month">
+              <ChevronLeft size={16} />
+            </button>
+            <button className="btn-ghost p-1" onClick={() => setPageNum(p => p + 1)} aria-label="next month">
+              <ChevronRight size={16} />
+            </button>
+          </div>
           {pickerOpen && (
             <div className="absolute left-0 top-full mt-1 z-10 bg-slate-900 rounded-lg shadow-lg border border-slate-700 p-2 min-w-[200px]">
               <div className="flex items-center gap-2 mb-2">
