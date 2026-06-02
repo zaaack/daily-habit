@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
 import { PROJECT_COLORS, PROJECT_EMOJIS } from '@/db/schema'
@@ -39,6 +39,17 @@ export function ProjectEditor({ open, onOpenChange, initial, onDelete }: Props) 
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const isEdit = !!initial?.id
+
+  useEffect(() => {
+    if (open) {
+      setName(initial?.name ?? '')
+      setDescription(initial?.description ?? '')
+      setUnit(initial?.unit ?? '')
+      setEmoji(initial?.emoji ?? PROJECT_EMOJIS[0])
+      setColor(initial?.color ?? PROJECT_COLORS[0])
+      setConfirmDelete(false)
+    }
+  }, [open, initial?.id])
 
   async function handleSubmit() {
     if (!name.trim()) return
