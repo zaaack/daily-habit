@@ -47,14 +47,15 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const tagName = `v${process.env.VERSION}`;
+            const tag = `v${process.env.VERSION}`;
+            // Check if a release already exists for this tag
             try {
               const { data: existing } = await github.rest.repos.getReleaseByTag({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                tag: tagName,
+                tag,
               });
-              console.log(`Reusing existing release ${existing.id} for tag ${tagName}`);
+              console.log(`Reusing existing release ${existing.id} for tag ${tag}`);
               return existing.id;
             } catch (e) {
               if (e.status !== 404) throw e;
@@ -62,13 +63,13 @@ jobs:
             const { data } = await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              tag_name: tagName,
+              tag_name: tag,
               name: `Daily Habit v${process.env.VERSION}`,
               body: 'Take a look at the assets to download and install this app.',
               draft: true,
               prerelease: false
-            });
-            return data.id;
+            })
+            return data.id
         env:
           VERSION: ${{ steps.get-version.outputs.version }}
 
@@ -235,6 +236,15 @@ jobs:
             const success = ['success', 'skipped'];
             if (!success.includes(process.env.desktop_result) && !success.includes(process.env.android_result)) {
               core.setFailed('All build jobs failed or were cancelled.');
+              return;
+            }
+            const { data: release } = await github.rest.repos.getRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: parseInt(process.env.release_id),
+            });
+            if (!release.draft) {
+              console.log('Release is already published, skipping.');
               return;
             }
             await github.rest.repos.updateRelease({
