@@ -18,14 +18,11 @@ export function StatusCell({ projectId, date, checkin, unit, color, compact, ref
   const [open, setOpen] = useState(false)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const status = checkin?.status
-  const value = checkin?.value
+  const dayNum = date.slice(8)
 
-  const base =
-    'relative grid place-items-center rounded-md border select-none transition active:scale-90'
+  const base = 'relative grid place-items-center rounded-md border select-none transition active:scale-90'
   const sizeCls = compact ? 'h-7 w-7 text-[10px]' : 'h-9 w-9 text-xs'
-  let cls = 'bg-slate-900/40 border-slate-800 text-slate-600'
-  if (status === 'success') cls = 'text-slate-950'
-  else if (status === 'fail') cls = 'text-white'
+  const defaultCls = 'bg-slate-900/40 border-slate-800 text-slate-600'
 
   function startLongPress() {
     longPressTimer.current = setTimeout(() => setOpen(true), 500)
@@ -40,7 +37,7 @@ export function StatusCell({ projectId, date, checkin, unit, color, compact, ref
   return (
     <>
       <button
-        className={cn(base, sizeCls, cls)}
+        className={cn(base, sizeCls, status ? '' : defaultCls)}
         style={
           status === 'success'
             ? { background: color, borderColor: color, color: '#020617' }
@@ -57,8 +54,7 @@ export function StatusCell({ projectId, date, checkin, unit, color, compact, ref
         onTouchCancel={cancelLongPress}
         title={date}
       >
-        {status === 'success' && (value != null ? value : '✓')}
-        {status === 'fail' && '✕'}
+        {dayNum}
       </button>
       <CheckinEditor
         key={open ? 'open' : `closed-${refreshKey ?? 0}`}

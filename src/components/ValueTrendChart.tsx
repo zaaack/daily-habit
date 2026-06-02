@@ -2,30 +2,29 @@ import { useEffect, useRef } from 'react'
 import uPlot, { type Options as UPlotOptions, type AlignedData } from 'uplot'
 import 'uplot/dist/uPlot.min.css'
 import type { Checkin } from '@/db/types'
-import { shiftDateStr, todayStr } from '@/db/schema'
+import { monthDays } from '@/db/schema'
 
 interface Props {
   checkins: Checkin[]
   color: string
-  days?: number
+  year: number
+  month: number
 }
 
-export function ValueTrendChart({ checkins, color, days = 90 }: Props) {
+export function ValueTrendChart({ checkins, color, year, month }: Props) {
   const ref = useRef<HTMLDivElement | null>(null)
   const plotRef = useRef<uPlot | null>(null)
 
   useEffect(() => {
     if (!ref.current) return
-    const today = todayStr()
+    const days = monthDays(year, month)
     const xs: number[] = []
     const ys: (number | null)[] = []
     const map = new Map(checkins.filter(c => c.value != null).map(c => [c.date, c.value!]))
-    for (let i = days - 1; i >= 0; i--) {
-      const d = shiftDateStr(today, -i)
+    for (const d of days) {
       xs.push(Math.floor(new Date(d + 'T00:00:00').getTime() / 1000))
       ys.push(map.get(d) ?? null)
     }
-    // Convert nulls to NaN for uPlot to break line
     const data: AlignedData = [xs, ys.map(v => v == null ? Number.NaN : v)]
 
     if (plotRef.current) {
@@ -66,7 +65,7 @@ export function ValueTrendChart({ checkins, color, days = 90 }: Props) {
       plotRef.current?.destroy()
       plotRef.current = null
     }
-  }, [checkins, color, days])
+  }, [checkins, color, year, month])
 
   return <div ref={ref} className="w-full" />
 }

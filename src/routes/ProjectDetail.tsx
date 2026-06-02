@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Settings as SettingsIcon } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RotateCcw, Settings as SettingsIcon } from 'lucide-react'
 import { useAppStore } from '@/state/useAppStore'
 import { monthDays, todayStr } from '@/db/schema'
 import type { Checkin } from '@/db/types'
@@ -14,7 +14,10 @@ export function ProjectDetail() {
   const projects = useAppStore(s => s.projects)
   const cycle = useAppStore(s => s.cycleCheckin)
   const project = useMemo(() => projects.find(p => p.id === id), [projects, id])
-  const [now, setNow] = useState(new Date())
+  const [now, setNow] = useState(() => {
+    const [y, m] = todayStr().split('-').map(Number)
+    return new Date(y, m - 1, 1)
+  })
   const [checkins, setCheckins] = useState<Checkin[]>([])
   const [tick, setTick] = useState(0)
   const [editorOpen, setEditorOpen] = useState(false)
@@ -46,14 +49,19 @@ export function ProjectDetail() {
   const days = monthDays(year, month)
   const byDate = new Map(checkins.map(c => [c.date, c]))
   const today = todayStr()
+  const [ty, tm] = today.split('-').map(Number)
+  const isCurrentMonth = year === ty && month === tm - 1
 
   function shift(delta: number) {
-    const d = new Date(year, month + delta, 1)
-    setNow(d)
+    setNow(new Date(year, month + delta, 1))
+  }
+  function goCurrentMonth() {
+    const [y, m] = today.split('-').map(Number)
+    setNow(new Date(y, m - 1, 1))
   }
 
   // group by week
-  const firstDow = new Date(year, month, 1).getDay() // 0=Sun
+  const firstDow = new Date(year, month, 1).getDay()
   const rows: (string | null)[][] = []
   let week: (string | null)[] = Array(firstDow).fill(null)
   for (const d of days) {
@@ -85,7 +93,7 @@ export function ProjectDetail() {
       <div className="card">
         <div className="flex items-center mb-2">
           <button className="btn-ghost p-1" onClick={() => shift(-1)}><ChevronLeft size={16} /></button>
-          <div className="flex-1 text-center text-sm font-semibold">{year} 年 {month + 1} 月</div>
+          <div className="flex-1 text-center text-sm font-semibold tabular-nums">{year} 年 {month + 1} 月</div>
           <button className="btn-ghost p-1" onClick={() => shift(1)}><ChevronRight size={16} /></button>
         </div>
         <div className="grid grid-cols-7 gap-1 text-[10px] text-slate-500 mb-1">
@@ -115,12 +123,22 @@ export function ProjectDetail() {
             </div>
           ))}
         </div>
+        {!isCurrentMonth && (
+          <div className="mt-2 text-center">
+            <button
+              onClick={goCurrentMonth}
+              className="text-[11px] text-brand-500 hover:text-brand-400 inline-flex items-center gap-0.5"
+            >
+              <RotateCcw size={10} /> 回到本月
+            </button>
+          </div>
+        )}
       </div>
 
       {project.unit && (
         <div className="card">
-          <div className="text-sm font-semibold mb-2">数值趋势（近 90 天）</div>
-          <ValueTrendChart checkins={checkins} color={project.color} />
+          <div className="text-sm font-semibold mb-2">数值趋势 · {month + 1} 月</div>
+          <ValueTrendChart checkins={checkins} color={project.color} year={year} month={month} />
         </div>
       )}
 

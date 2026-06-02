@@ -1,15 +1,63 @@
-import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Plus, RotateCcw } from 'lucide-react'
 import { useAppStore } from '@/state/useAppStore'
 import { ProjectCard } from '@/components/ProjectCard'
 import { ProjectEditor } from '@/components/ProjectEditor'
+import { shiftDateStr, todayStr } from '@/db/schema'
+
+const DAYS_PER_PAGE = 7
 
 export function Home() {
   const projects = useAppStore(s => s.projects)
   const [open, setOpen] = useState(false)
+  const [endOffset, setEndOffset] = useState(0)
+  const startXRef = useRef<number | null>(null)
+
+  const today = todayStr()
+  const dates: string[] = []
+  for (let i = 0; i < DAYS_PER_PAGE; i++) dates.push(shiftDateStr(today, endOffset - i))
+
+  const oldest = dates[dates.length - 1]
+  const newest = dates[0]
+  const rangeLabel = `${oldest.slice(5)} – ${newest.slice(5)}`
+  const isCurrent = endOffset === 0
+
+  function onTouchStart(e: React.TouchEvent) {
+    startXRef.current = e.touches[0].clientX
+  }
+  function onTouchEnd(e: React.TouchEvent) {
+    if (startXRef.current == null) return
+    const dx = e.changedTouches[0].clientX - startXRef.current
+    startXRef.current = null
+    if (Math.abs(dx) < 60) return
+    if (dx < 0) setEndOffset(v => v + DAYS_PER_PAGE)
+    else setEndOffset(v => v - DAYS_PER_PAGE)
+  }
 
   return (
     <div className="space-y-2">
+      <div className="card">
+        <div className="flex items-center gap-2 text-[11px] text-slate-500 mb-1">
+          <span className="tabular-nums">{rangeLabel}</span>
+          <div className="flex-1" />
+          {!isCurrent && (
+            <button
+              onClick={() => setEndOffset(0)}
+              className="text-brand-500 hover:text-brand-400 inline-flex items-center gap-0.5"
+              title="回到本周"
+            >
+              <RotateCcw size={10} /> 本周
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-[9px] text-slate-500">
+          {dates.map(d => {
+            const dow = new Date(d + 'T00:00:00').getDay()
+            return <div key={'dow-' + d} className="text-center">{'日一二三四五六'[dow]}</div>
+          })}
+        </div>
+      </div>
+
       {projects.length === 0 ? (
         <div className="card text-center text-slate-500 py-10">
           <div className="text-2xl mb-2">📝</div>
@@ -17,7 +65,16 @@ export function Home() {
           <div className="text-xs text-slate-400 mt-1">点击右下角 + 创建一个</div>
         </div>
       ) : (
-        projects.map(p => <ProjectCard key={p.id} project={p} />)
+        <div
+          className="space-y-2"
+          style={{ touchAction: 'pan-y' }}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
+          {projects.map(p => (
+            <ProjectCard key={p.id} project={p} dates={dates} />
+          ))}
+        </div>
       )}
 
       <button
