@@ -35,24 +35,30 @@ export const useAppStore = create<AppState>((set, get) => ({
   conflicts: {},
 
   async init() {
-    const repo = await getRepo()
-    const recent = await repo.getKV<number>('recentDays')
-    const lastSyncAt = await repo.getKV<number>('sync.lastAt')
-    const lastSyncErr = await repo.getKV<string>('sync.lastError')
-    const projects = await repo.listProjects()
-    set({
-      recentDays: recent ?? 5,
-      projects,
-      sync: {
-        status: lastSyncErr ? 'error' : 'ok',
-        at: lastSyncAt ?? null,
-        error: lastSyncErr ?? null,
-        pending: 0,
-      },
-      ready: true,
-    })
-
-    void get().triggerSync()
+    try {
+      const repo = await getRepo()
+      const recent = await repo.getKV<number>('recentDays')
+      const lastSyncAt = await repo.getKV<number>('sync.lastAt')
+      const lastSyncErr = await repo.getKV<string>('sync.lastError')
+      const projects = await repo.listProjects()
+      set({
+        recentDays: recent ?? 5,
+        projects,
+        sync: {
+          status: lastSyncErr ? 'error' : 'ok',
+          at: lastSyncAt ?? null,
+          error: lastSyncErr ?? null,
+          pending: 0,
+        },
+        ready: true,
+      })
+      void get().triggerSync()
+    } catch (e) {
+      set({
+        sync: { status: 'error', at: null, error: e instanceof Error ? e.message : String(e), pending: 0 },
+        ready: true,
+      })
+    }
   },
 
   setRecentDays(n) {

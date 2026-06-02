@@ -57,14 +57,28 @@ export function Settings() {
   }
 
   async function handleImport(file: File) {
-    const text = await file.text()
-    const data = JSON.parse(text) as { projects: any[]; checkins: any[] }
-    const repo = await getRepo()
-    for (const p of data.projects) await repo.upsertProject(p)
-    for (const c of data.checkins) await repo.upsertCheckin(c)
-    const projects = await repo.listProjects()
-    useAppStore.setState({ projects })
-    for (const p of projects) void syncOneProject(p.id).catch(() => {})
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text) as { projects?: unknown[]; checkins?: unknown[] }
+      if (!Array.isArray(data.projects) || !Array.isArray(data.checkins)) {
+        alert('文件格式不正确（应包含 projects 和 checkins 数组）')
+        return
+      }
+      const repo = await getRepo()
+      for (const p of data.projects) {
+        if (p && typeof p === 'object' && 'id' in p) await repo.upsertProject(p as Parameters<typeof repo.upsertProject>[0])
+      }
+      for (const c of data.checkins) {
+        if (c && typeof c === 'object' && 'projectId' in c && 'date' in c) {
+          await repo.upsertCheckin(c as Parameters<typeof repo.upsertCheckin>[0])
+        }
+      }
+      const projects = await repo.listProjects()
+      useAppStore.setState({ projects })
+      for (const p of projects) void syncOneProject(p.id).catch(() => {})
+    } catch (e) {
+      alert('导入失败：' + (e instanceof Error ? e.message : String(e)))
+    }
   }
 
   async function handleClear() {
