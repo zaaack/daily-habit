@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ChevronLeft, RotateCcw, Settings as SettingsIcon } from 'lucide-react'
+import { ChevronLeft, ChevronDown, RotateCcw, Settings as SettingsIcon } from 'lucide-react'
 import { useAppStore } from '@/state/useAppStore'
 import { todayStr } from '@/db/schema'
 import type { Checkin } from '@/db/types'
@@ -22,6 +22,16 @@ function getSunday(dateStr: string): Date {
   const d = new Date(dateStr + 'T00:00:00')
   d.setDate(d.getDate() - d.getDay())
   return d
+}
+
+function monthDiff(y1: number, m1: number, y2: number, m2: number): number {
+  return (y2 - y1) * 12 + (m2 - m1)
+}
+
+function pageToMonthYear(pageNum: number): [number, number] {
+  const refSunday = getSunday(todayStr())
+  refSunday.setDate(refSunday.getDate() + pageNum * 35 + 14)
+  return [refSunday.getFullYear(), refSunday.getMonth() + 1]
 }
 
 function buildPage(pageNum: number): WeekRow[] {
@@ -58,6 +68,7 @@ export function ProjectDetail() {
   const [checkins, setCheckins] = useState<Checkin[]>([])
   const [tick, setTick] = useState(0)
   const [editorOpen, setEditorOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   const today = todayStr()
   const [pageNum, setPageNum] = useState(0)
@@ -72,6 +83,8 @@ export function ProjectDetail() {
     curr: buildPage(pageNum),
     next: buildPage(pageNum + 1),
   }), [pageNum])
+
+  const [viewYear, viewMonth] = useMemo(() => pageToMonthYear(pageNum), [pageNum])
 
   useEffect(() => {
     const el = currRef.current
@@ -111,6 +124,13 @@ export function ProjectDetail() {
     setPageNum(0)
   }, [])
 
+  const navigateToMonth = useCallback((year: number, month: number) => {
+    const [ty, tm] = today.split('-').map(Number)
+    const diff = monthDiff(ty, tm, year, month)
+    setPageNum(Math.round(diff * 4.345))
+    setPickerOpen(false)
+  }, [today])
+
   const byDate = new Map(checkins.map(c => [c.date, c]))
   const [ty, tm] = today.split('-').map(Number)
 
@@ -144,9 +164,6 @@ export function ProjectDetail() {
       const hasToday = w.days.some(d => d === today)
       return (
         <div key={wi}>
-          {w.monthLabel && (
-            <div className="text-[10px] text-slate-500 font-semibold pb-0.5">{w.monthLabel}</div>
-          )}
           <div className={cn('grid grid-cols-7 gap-1', hasToday && 'bg-brand-500/5 rounded-md')}>
             {w.days.map((d, j) => {
               if (!d) return <div key={j} />
@@ -192,8 +209,53 @@ export function ProjectDetail() {
       </div>
 
       <div className="card">
-        <div className="grid grid-cols-7 gap-1 text-[10px] text-slate-500 mb-1">
-          {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="text-center">{d}</div>)}
+        <div className="flex items-center justify-between mb-1">
+          <div className="relative">
+            <button
+              className="flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-brand-500"
+              onClick={() => setPickerOpen(v => !v)}
+            >
+              {viewYear} 年 {viewMonth} 月
+              <ChevronDown size={14} className={cn('transition-transform', pickerOpen && 'rotate-180')} />
+            </button>
+            {pickerOpen && (
+              <div className="absolute left-0 top-full mt-1 z-10 bg-white rounded-lg shadow-lg border border-slate-200 p-2 min-w-[200px]">
+                <div className="flex items-center gap-2 mb-2">
+                  <select
+                    className="flex-1 text-sm border border-slate-200 rounded px-2 py-1"
+                    value={viewYear}
+                    onChange={e => {
+                      const y = Number(e.target.value)
+                      navigateToMonth(y, viewMonth)
+                    }}
+                  >
+                    {Array.from({ length: 11 }, (_, i) => ty - 5 + i).map(y => (
+                      <option key={y} value={y}>{y} 年</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                    <button
+                      key={m}
+                      className={cn(
+                        'text-xs py-1.5 rounded',
+                        m === viewMonth
+                          ? 'bg-brand-500 text-white'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      )}
+                      onClick={() => navigateToMonth(viewYear, m)}
+                    >
+                      {m} 月
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-7 gap-1 text-[10px] text-slate-500 flex-1 ml-3">
+            {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="text-center">{d}</div>)}
+          </div>
         </div>
         <div
           className="overflow-hidden select-none cursor-grab active:cursor-grabbing"
