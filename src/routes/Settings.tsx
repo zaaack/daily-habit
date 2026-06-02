@@ -132,13 +132,8 @@ export function Settings() {
       }
       const projects = await repo.listProjects()
       useAppStore.setState({ projects })
-      await useAppStore.getState().triggerSync()
       setImporting(null)
-      if (useAppStore.getState().sync.status === 'error') {
-        alert(t('settings.syncFailed', { msg: useAppStore.getState().sync.error ?? '' }))
-      } else {
-        alert(t('settings.importSuccess'))
-      }
+      alert(t('settings.importSuccess'))
     } catch (e) {
       setImporting(null)
       alert(t('settings.importFailed', { msg: e instanceof Error ? e.message : String(e) }))
@@ -223,13 +218,8 @@ export function Settings() {
     }
     const projects = await repo.listProjects()
     useAppStore.setState({ projects })
-    await useAppStore.getState().triggerSync()
     setImporting(null)
-    if (useAppStore.getState().sync.status === 'error') {
-      alert(t('settings.syncFailed', { msg: useAppStore.getState().sync.error ?? '' }))
-    } else {
-      alert(t('settings.importSuccess'))
-    }
+    alert(t('settings.importSuccess'))
   }
 
   return (
