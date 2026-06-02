@@ -61,7 +61,7 @@ jobs:
         env:
           VERSION: ${{ steps.get-version.outputs.version }}
 
-  # ── Android ─────────────────────────────────────────────────────────
+  # ── Android (ARM only, APK + AAB) ──────────────────────────────────
   build-android:
     needs: create-release
     if: github.event_name == 'push' || contains(github.event.inputs.targets || '', 'android')
@@ -116,10 +116,10 @@ jobs:
             echo "ANDROID_NDK_HOME=${NDK_DIR%/}" >> "$GITHUB_ENV"
           fi
 
-      - name: Build Android APK (ARM only)
-        run: pnpm tauri:android:build --target aarch64 --target armv7
+      - name: Build Android (ARM APK + AAB)
+        run: pnpm tauri android build --target aarch64 --target armv7
 
-      - name: Upload APK to Release
+      - name: Upload artifacts to Release
         uses: actions/github-script@v7
         env:
           release_id: ${{ needs.create-release.outputs.release_id }}
@@ -128,7 +128,10 @@ jobs:
             const fs = require('fs');
             const path = require('path');
 
-            const apkDir = 'src-tauri/gen/android/app/build/outputs/apk';
+            const dirs = [
+              'src-tauri/gen/android/app/build/outputs/apk',
+              'src-tauri/gen/android/app/build/outputs/bundle',
+            ];
             const files = [];
 
             function walkDir(dir) {
@@ -136,10 +139,10 @@ jobs:
               for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
                 const full = path.join(dir, entry.name);
                 if (entry.isDirectory()) walkDir(full);
-                else if (entry.name.endsWith('.apk')) files.push(full);
+                else if (entry.name.endsWith('.apk') || entry.name.endsWith('.aab')) files.push(full);
               }
             }
-            walkDir(apkDir);
+            for (const dir of dirs) walkDir(dir);
 
             for (const file of files) {
               const data = fs.readFileSync(file);
@@ -153,7 +156,7 @@ jobs:
               console.log(`Uploaded: ${file}`);
             }
 
-  # ── Desktop (Linux / macOS / Windows) ──────────────────────────────
+  # ── Desktop (Linux ARM64 / macOS / Windows) ────────────────────────
   build-desktop:
     needs: create-release
     if: github.event_name == 'push' || github.event.inputs.targets != ''
@@ -161,7 +164,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: ubuntu-22.04
+          - platform: ubuntu-24.04-arm
             args: ''
           - platform: macos-latest
             args: '--target aarch64-apple-darwin'
@@ -188,11 +191,9 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Install system dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04'
+        if: startsWith(matrix.platform, 'ubuntu')
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
