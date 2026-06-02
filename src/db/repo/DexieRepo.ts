@@ -1,0 +1,87 @@
+import Dexie, { type Table } from 'dexie'
+import type { Repo, DateRange } from './Repo'
+import type { Project, Checkin, SettingKV } from '../types'
+import { SCHEMA_VERSION } from '../schema'
+
+class HabitDB extends Dexie {
+  projects!: Table<Project, string>
+  checkins!: Table<Checkin, [string, string]>
+  kv!: Table<SettingKV, string>
+
+  constructor() {
+    super('daily-habit')
+    this.version(SCHEMA_VERSION).stores({
+      projects: 'id, updatedAt, deleted',
+      checkins: '[projectId+date], projectId, date, updatedAt',
+      kv: 'key',
+    })
+  }
+}
+
+export class DexieRepo implements Repo {
+  private db: HabitDB
+
+  constructor() {
+    this.db = new HabitDB()
+  }
+
+  async init(): Promise<void> {
+    await this.db.open()
+  }
+
+  async listProjects(includeDeleted = false): Promise<Project[]> {
+    const all = await this.db.projects.toArray()
+    return includeDeleted ? all : all.filter(p => p.deleted === 0)
+  }
+
+  async getProject(id: string): Promise<Project | undefined> {
+    return this.db.projects.get(id)
+  }
+
+  async upsertProject(p: Project): Promise<void> {
+    await this.db.projects.put(p)
+  }
+
+  async softDeleteProject(id: string, updatedAt: number): Promise<void> {
+    const p = await this.db.projects.get(id)
+    if (!p) return
+    p.deleted = 1
+    p.updatedAt = updatedAt
+    await this.db.projects.put(p)
+  }
+
+  async getCheckin(projectId: string, date: string): Promise<Checkin | undefined> {
+    return this.db.checkins.get([projectId, date])
+  }
+
+  async getCheckins(projectId: string, range?: DateRange): Promise<Checkin[]> {
+    let coll = this.db.checkins.where('projectId').equals(projectId)
+    let arr = await coll.toArray()
+    if (range?.from) arr = arr.filter(c => c.date >= range.from!)
+    if (range?.to) arr = arr.filter(c => c.date <= range.to!)
+    arr.sort((a, b) => a.date.localeCompare(b.date))
+    return arr
+  }
+
+  async upsertCheckin(c: Checkin): Promise<void> {
+    await this.db.checkins.put(c)
+  }
+
+  async deleteCheckin(projectId: string, date: string): Promise<void> {
+    await this.db.checkins.delete([projectId, date])
+  }
+
+  async getKV<T = unknown>(key: string): Promise<T | null> {
+    const r = await this.db.kv.get(key)
+    if (!r) return null
+    try { return JSON.parse(r.value) as T } catch { return null }
+  }
+
+  async setKV(key: string, value: unknown): Promise<void> {
+    await this.db.kv.put({ key, value: JSON.stringify(value) })
+  }
+
+  async deleteKV(key: string): Promise<void> {
+    await this.db.kv.delete(key)
+  }
+}

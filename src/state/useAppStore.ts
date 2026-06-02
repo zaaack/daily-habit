@@ -1,0 +1,207 @@
+import { create } from 'zustand'
+import { nanoid } from 'nanoid'
+import { getRepo, makeProjectId, makeRemotePath, nowMs, todayStr, DEFAULT_REMOTE_DIR } from '@/db'
+import type { Project, Checkin, SyncState, CheckStatus } from '@/db/types'
+import { runFullSync, syncOneProject } from '@/sync/fullSync'
+import type { ConflictItem } from '@/db/types'
+
+interface AppState {
+  ready: boolean
+  projects: Project[]
+  recentDays: number
+  sync: SyncState
+  conflicts: Record<string, ConflictItem[]>
+
+  init(): Promise<void>
+  setRecentDays(n: number): void
+
+  addProject(input: { name: string; unit: string | null; emoji: string; color: string }): Promise<Project>
+  updateProject(id: string, patch: Partial<Pick<Project, 'name' | 'unit' | 'emoji' | 'color'>>): Promise<void>
+  deleteProject(id: string): Promise<void>
+
+  cycleCheckin(projectId: string, date: string): Promise<void>
+  setCheckin(projectId: string, date: string, status: CheckStatus | null, value: number | null, note: string | null): Promise<void>
+
+  triggerSync(): Promise<void>
+  resolveConflict(projectId: string, items: ConflictItem[]): Promise<void>
+  clearConflict(projectId: string): Promise<void>
+}
+
+export const useAppStore = create<AppState>((set, get) => ({
+  ready: false,
+  projects: [],
+  recentDays: 5,
+  sync: { status: 'idle', at: null, error: null, pending: 0 },
+  conflicts: {},
+
+  async init() {
+    const repo = await getRepo()
+    const recent = await repo.getKV<number>('recentDays')
+    const lastSyncAt = await repo.getKV<number>('sync.lastAt')
+    const lastSyncErr = await repo.getKV<string>('sync.lastError')
+    const projects = await repo.listProjects()
+    set({
+      recentDays: recent ?? 5,
+      projects,
+      sync: {
+        status: lastSyncErr ? 'error' : 'ok',
+        at: lastSyncAt ?? null,
+        error: lastSyncErr ?? null,
+        pending: 0,
+      },
+      ready: true,
+    })
+
+    void get().triggerSync()
+  },
+
+  setRecentDays(n) {
+    set({ recentDays: n })
+    void getRepo().then(r => r.setKV('recentDays', n))
+  },
+
+  async addProject({ name, unit, emoji, color }) {
+    const repo = await getRepo()
+    const now = nowMs()
+    const id = makeProjectId()
+    const project: Project = {
+      id,
+      name: name.trim(),
+      unit: unit?.trim() || null,
+      emoji,
+      color,
+      createdAt: now,
+      updatedAt: now,
+      remoteEtag: null,
+      remotePath: makeRemotePath(id, DEFAULT_REMOTE_DIR),
+      deleted: 0,
+    }
+    await repo.upsertProject(project)
+    set(s => ({ projects: [project, ...s.projects] }))
+    void get().triggerSync()
+    return project
+  },
+
+  async updateProject(id, patch) {
+    const repo = await getRepo()
+    const cur = await repo.getProject(id)
+    if (!cur) return
+    const next: Project = { ...cur, ...patch, updatedAt: nowMs() }
+    await repo.upsertProject(next)
+    set(s => ({ projects: s.projects.map(p => p.id === id ? next : p) }))
+    void syncOneProject(id).catch(() => {})
+  },
+
+  async deleteProject(id) {
+    const repo = await getRepo()
+    const now = nowMs()
+    await repo.softDeleteProject(id, now)
+    const cur = await repo.getProject(id)
+    if (cur) {
+      const next: Project = { ...cur, deleted: 1, updatedAt: now }
+      set(s => ({ projects: s.projects.map(p => p.id === id ? next : p) }))
+    }
+    void get().triggerSync()
+  },
+
+  async cycleCheckin(projectId, date) {
+    const repo = await getRepo()
+    const cur = await repo.getCheckin(projectId, date)
+    let nextStatus: CheckStatus | null
+    if (!cur) nextStatus = 'success'
+    else if (cur.status === 'success') nextStatus = 'fail'
+    else nextStatus = null
+    if (nextStatus === null) {
+      await repo.deleteCheckin(projectId, date)
+    } else {
+      const c: Checkin = {
+        projectId, date, status: nextStatus,
+        value: cur?.value ?? null, note: cur?.note ?? null,
+        updatedAt: nowMs(),
+      }
+      await repo.upsertCheckin(c)
+    }
+    void syncOneProject(projectId).catch(() => {})
+  },
+
+  async setCheckin(projectId, date, status, value, note) {
+    const repo = await getRepo()
+    if (status === null) {
+      await repo.deleteCheckin(projectId, date)
+    } else {
+      const c: Checkin = {
+        projectId, date, status, value, note,
+        updatedAt: nowMs(),
+      }
+      await repo.upsertCheckin(c)
+    }
+    void syncOneProject(projectId).catch(() => {})
+  },
+
+  async triggerSync() {
+    const repo = await getRepo()
+    set(s => ({ sync: { ...s.sync, status: 'syncing', pending: s.sync.pending + 1 } }))
+    try {
+      await runFullSync(repo, {
+        onConflict: (projectId, items) => {
+          set(s => ({ conflicts: { ...s.conflicts, [projectId]: items } }))
+        },
+        onProjectsChange: (projects) => {
+          set({ projects })
+        },
+      })
+      const at = nowMs()
+      await repo.setKV('sync.lastAt', at)
+      await repo.deleteKV('sync.lastError')
+      set(s => ({ sync: { ...s.sync, status: 'ok', at, error: null, pending: Math.max(0, s.sync.pending - 1) } }))
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      await repo.setKV('sync.lastError', msg)
+      set(s => ({ sync: { ...s.sync, status: 'error', error: msg, pending: Math.max(0, s.sync.pending - 1) } }))
+    }
+  },
+
+  async resolveConflict(projectId, items) {
+    const repo = await getRepo()
+    const resolvedItems = items.map(i => ({ ...i, resolution: i.resolution ?? 'local' as const }))
+    for (const it of resolvedItems) {
+      const cur = await repo.getCheckin(projectId, it.date)
+      if (it.resolution === 'local') continue
+      if (it.resolution === 'remote') {
+        if (cur) {
+          if (it.field === 'status') {
+            if (it.remote === null) await repo.deleteCheckin(projectId, it.date)
+            else await repo.upsertCheckin({ ...cur, status: it.remote as CheckStatus, updatedAt: nowMs() })
+          } else if (it.field === 'value') {
+            await repo.upsertCheckin({ ...cur, value: it.remote as number | null, updatedAt: nowMs() })
+          } else if (it.field === 'note') {
+            await repo.upsertCheckin({ ...cur, note: it.remote as string | null, updatedAt: nowMs() })
+          }
+        } else if (it.remote !== null) {
+          await repo.upsertCheckin({
+            projectId, date: it.date,
+            status: 'success', value: null, note: null,
+            updatedAt: nowMs(),
+          })
+        }
+      }
+    }
+    set(s => {
+      const c = { ...s.conflicts }
+      delete c[projectId]
+      return { conflicts: c }
+    })
+    void get().triggerSync()
+  },
+
+  async clearConflict(projectId) {
+    set(s => {
+      const c = { ...s.conflicts }
+      delete c[projectId]
+      return { conflicts: c }
+    })
+  },
+}))
+
+export const newCheckinId = () => nanoid(8)
+export { todayStr }
