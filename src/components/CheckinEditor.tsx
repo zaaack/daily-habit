@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
 import { Modal } from './Modal'
 import type { Checkin, CheckStatus } from '@/db/types'
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function CheckinEditor({ open, onOpenChange, projectId, date, initial, unit }: Props) {
+  const { t } = useTranslation()
   const setCheckin = useAppStore(s => s.setCheckin)
   const [status, setStatus] = useState<CheckStatus>(initial?.status ?? 'success')
   const [value, setValue] = useState<string>(initial?.value != null ? String(initial.value) : '')
@@ -24,10 +26,10 @@ export function CheckinEditor({ open, onOpenChange, projectId, date, initial, un
   }
 
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title={`编辑 · ${date}`}>
+    <Modal open={open} onOpenChange={onOpenChange} title={t('checkin.edit', { date })}>
       <div className="space-y-3">
         <div>
-          <div className="label mb-1">状态</div>
+          <div className="label mb-1">{t('checkin.status')}</div>
           <div className="flex gap-1.5">
             {(['success', 'fail'] as CheckStatus[]).map(s => (
               <button
@@ -39,29 +41,29 @@ export function CheckinEditor({ open, onOpenChange, projectId, date, initial, un
                     ? (s === 'success' ? 'bg-brand-500 text-white' : 'bg-rose-500 text-white')
                     : 'btn-outline')
                 }
-              >{s === 'success' ? '✅ 完成' : '❌ 失败'}</button>
+              >{s === 'success' ? t('checkin.done') : t('checkin.fail')}</button>
             ))}
           </div>
         </div>
 
         <div>
-          <div className="label mb-1">数值 {unit && <span className="text-slate-500">（{unit}）</span>}</div>
+          <div className="label mb-1">{t('checkin.value')}{unit && <span className="text-slate-500">{t('checkin.unitLabel', { unit })}</span>}</div>
           <input
             className="input"
             inputMode="decimal"
             value={value}
             onChange={e => setValue(e.target.value)}
-            placeholder="留空表示未填写"
+            placeholder={t('checkin.valuePlaceholder')}
           />
         </div>
 
         <div>
-          <div className="label mb-1">备注</div>
+          <div className="label mb-1">{t('checkin.note')}</div>
           <textarea
             className="input min-h-[64px]"
             value={note}
             onChange={e => setNote(e.target.value)}
-            placeholder="可选"
+            placeholder={t('checkin.notePlaceholder')}
           />
         </div>
 
@@ -70,10 +72,10 @@ export function CheckinEditor({ open, onOpenChange, projectId, date, initial, un
             <button
               className="btn-outline text-rose-400 border-rose-900/40"
               onClick={() => save({ status: null, value: null, note: null })}
-            >清空</button>
+            >{t('checkin.clear')}</button>
           )}
           <div className="flex-1" />
-          <button className="btn-ghost" onClick={() => onOpenChange(false)}>取消</button>
+          <button className="btn-ghost" onClick={() => onOpenChange(false)}>{t('checkin.cancel')}</button>
           <button
             className="btn-primary"
             onClick={() => save({
@@ -81,7 +83,7 @@ export function CheckinEditor({ open, onOpenChange, projectId, date, initial, un
               value: value === '' ? null : Number(value),
               note: note.trim() || null,
             })}
-          >保存</button>
+          >{t('checkin.save')}</button>
         </div>
       </div>
     </Modal>

@@ -1,11 +1,13 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Home as HomeIcon, ListChecks, Settings as SettingsIcon, RefreshCw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
 import { cn } from '@/lib/cn'
 import { formatDistanceToNow } from 'date-fns'
-import { zhCN } from 'date-fns/locale'
+import { getDateFnsLocale } from '@/i18n/locale'
 
 export function Layout() {
+  const { t } = useTranslation()
   const sync = useAppStore(s => s.sync)
   const triggerSync = useAppStore(s => s.triggerSync)
   const loc = useLocation()
@@ -24,12 +26,12 @@ export function Layout() {
           <button
             className="btn-ghost p-2"
             onClick={() => void triggerSync()}
-            title="立即同步"
-            aria-label="立即同步"
+            title={t('layout.syncNow')}
+            aria-label={t('layout.syncNow')}
           >
             <RefreshCw size={16} className={sync.status === 'syncing' ? 'animate-spin' : ''} />
           </button>
-          <Link to="/settings" className="btn-ghost p-2" title="设置" aria-label="设置">
+          <Link to="/settings" className="btn-ghost p-2" title={t('layout.settings')} aria-label={t('layout.settings')}>
             <SettingsIcon size={16} />
           </Link>
         </div>
@@ -41,9 +43,9 @@ export function Layout() {
 
       <nav className="sticky bottom-0 z-30 bg-slate-950/90 backdrop-blur border-t border-slate-800">
         <div className="mx-auto max-w-3xl grid grid-cols-3">
-          <TabLink to="/" icon={<HomeIcon size={18} />} label="首页" />
-          <TabLink to="/history" icon={<ListChecks size={18} />} label="历史" />
-          <TabLink to="/settings" icon={<SettingsIcon size={18} />} label="设置" />
+          <TabLink to="/" icon={<HomeIcon size={18} />} label={t('nav.home')} />
+          <TabLink to="/history" icon={<ListChecks size={18} />} label={t('nav.history')} />
+          <TabLink to="/settings" icon={<SettingsIcon size={18} />} label={t('nav.settings')} />
         </div>
       </nav>
     </div>
@@ -69,15 +71,16 @@ function TabLink({ to, icon, label }: { to: string; icon: React.ReactNode; label
 }
 
 function SyncBadge() {
+  const { t, i18n } = useTranslation()
   const sync = useAppStore(s => s.sync)
-  let label = '空闲'
+  let label = t('sync.idle')
   let color = 'text-slate-400'
-  if (sync.status === 'syncing') { label = '同步中…'; color = 'text-amber-400' }
+  if (sync.status === 'syncing') { label = t('sync.syncing'); color = 'text-amber-400' }
   else if (sync.status === 'ok' && sync.at) {
-    try { label = `已同步 · ${formatDistanceToNow(new Date(sync.at), { addSuffix: true, locale: zhCN })}` }
-    catch { label = '已同步' }
+    try { label = t('sync.synced', { relative: formatDistanceToNow(new Date(sync.at), { addSuffix: true, locale: getDateFnsLocale(i18n.language) }) }) }
+    catch { label = t('sync.syncedShort') }
     color = 'text-slate-400'
-  } else if (sync.status === 'error') { label = '同步失败'; color = 'text-rose-400' }
-  else if (sync.status === 'conflict') { label = '有冲突'; color = 'text-amber-300' }
+  } else if (sync.status === 'error') { label = t('sync.error'); color = 'text-rose-400' }
+  else if (sync.status === 'conflict') { label = t('sync.conflict'); color = 'text-amber-300' }
   return <span className={cn('text-xs', color)}>{label}</span>
 }

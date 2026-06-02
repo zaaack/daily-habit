@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
 import { Home } from '@/routes/Home'
 import { ProjectDetail } from '@/routes/ProjectDetail'
@@ -38,6 +39,7 @@ function applyThemeFromStored() {
 }
 
 export function App() {
+  const { t } = useTranslation()
   const init = useAppStore(s => s.init)
   const ready = useAppStore(s => s.ready)
   const bootedRef = useRef(false)
@@ -58,7 +60,7 @@ export function App() {
   if (!ready) {
     return (
       <div className="grid h-full place-items-center text-slate-500">
-        <div className="animate-pulse">正在准备…</div>
+        <div className="animate-pulse">{t('app.loading')}</div>
       </div>
     )
   }

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
 import { PROJECT_COLORS, PROJECT_EMOJIS } from '@/db/schema'
 import { Modal } from './Modal'
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export function ProjectEditor({ open, onOpenChange, initial, onDelete }: Props) {
+  const { t } = useTranslation()
   const addProject = useAppStore(s => s.addProject)
   const updateProject = useAppStore(s => s.updateProject)
   const deleteProject = useAppStore(s => s.deleteProject)
@@ -47,19 +49,19 @@ export function ProjectEditor({ open, onOpenChange, initial, onDelete }: Props) 
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title={isEdit ? '编辑项目' : '新建项目'}
+      title={isEdit ? t('editor.editProject') : t('editor.newProject')}
     >
       <div className="space-y-3">
         <div>
-          <div className="label mb-1">名称</div>
-          <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="例如 阅读" />
+          <div className="label mb-1">{t('editor.name')}</div>
+          <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder={t('editor.namePlaceholder')} />
         </div>
         <div>
-          <div className="label mb-1">单位（可选）</div>
-          <input className="input" value={unit} onChange={e => setUnit(e.target.value)} placeholder="页 / km / 分钟" />
+          <div className="label mb-1">{t('editor.unit')}</div>
+          <input className="input" value={unit} onChange={e => setUnit(e.target.value)} placeholder={t('editor.unitPlaceholder')} />
         </div>
         <div>
-          <div className="label mb-1">图标</div>
+          <div className="label mb-1">{t('editor.icon')}</div>
           <div className="flex flex-wrap gap-1.5">
             {PROJECT_EMOJIS.map(e => (
               <button
@@ -74,7 +76,7 @@ export function ProjectEditor({ open, onOpenChange, initial, onDelete }: Props) 
           </div>
         </div>
         <div>
-          <div className="label mb-1">颜色</div>
+          <div className="label mb-1">{t('editor.color')}</div>
           <div className="flex flex-wrap gap-1.5">
             {PROJECT_COLORS.map(c => (
               <button
@@ -101,12 +103,12 @@ export function ProjectEditor({ open, onOpenChange, initial, onDelete }: Props) 
                 onDelete(initial.id)
                 onOpenChange(false)
               }}
-            >删除</button>
+            >{t('editor.delete')}</button>
           )}
           <div className="flex-1" />
-          <button className="btn-ghost" onClick={() => onOpenChange(false)}>取消</button>
+          <button className="btn-ghost" onClick={() => onOpenChange(false)}>{t('editor.cancel')}</button>
           <button className="btn-primary" disabled={busy || !name.trim()} onClick={handleSubmit}>
-            {isEdit ? '保存' : '创建'}
+            {isEdit ? t('editor.save') : t('editor.create')}
           </button>
         </div>
       </div>

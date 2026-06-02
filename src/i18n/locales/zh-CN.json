@@ -1,0 +1,129 @@
+{
+  "app": {
+    "loading": "正在准备…"
+  },
+  "layout": {
+    "syncNow": "立即同步",
+    "settings": "设置"
+  },
+  "nav": {
+    "home": "首页",
+    "history": "历史",
+    "settings": "设置"
+  },
+  "sync": {
+    "idle": "空闲",
+    "syncing": "同步中…",
+    "synced": "已同步 · {{relative}}",
+    "syncedShort": "已同步",
+    "error": "同步失败",
+    "conflict": "有冲突"
+  },
+  "home": {
+    "empty": "还没有打卡项目",
+    "emptyHint": "点击右下角 + 创建一个",
+    "newProject": "新建项目"
+  },
+  "project": {
+    "notFound": "项目不存在",
+    "backHome": "返回首页",
+    "back": "返回",
+    "goToCurrent": "回到本月",
+    "settings": "项目设置",
+    "yearMonth": "{{year}} 年 {{month}} 月",
+    "year": "{{year}} 年",
+    "month": "{{month}} 月",
+    "valueTrend": "数值趋势",
+    "monthlyStats": "月度统计",
+    "viewAllHistory": "查看全部历史 →",
+    "monthLabel": "{{year}} 年 {{month}} 月"
+  },
+  "history": {
+    "allProjects": "全部项目",
+    "allStatuses": "全部状态",
+    "done": "✅ 完成",
+    "fail": "❌ 失败",
+    "searchPlaceholder": "搜索项目名或备注",
+    "count": "共 {{count}} 条",
+    "exportCsv": "导出 CSV",
+    "noMatches": "没有匹配的记录"
+  },
+  "settings": {
+    "webdavSync": "WebDAV 同步",
+    "serverUrl": "服务器地址 (https://…)",
+    "username": "用户名",
+    "password": "密码",
+    "remoteDir": "远端目录",
+    "credentialHint": "凭据仅保存在本机（IndexedDB / SQLite）",
+    "testing": "测试中…",
+    "testConnection": "测试连接",
+    "save": "保存",
+    "syncNow": "立即同步",
+    "savedAt": "已保存于 {{time}}",
+    "status": "状态：",
+    "appearance": "外观",
+    "auto": "自动",
+    "light": "浅色",
+    "dark": "深色",
+    "autoHint": "\"自动\" 跟随系统设置；可手动锁定。",
+    "data": "数据",
+    "exportJson": "导出 JSON",
+    "importJson": "导入 JSON",
+    "clear": "清空",
+    "invalidFormat": "文件格式不正确",
+    "importFailed": "导入失败：{{msg}}",
+    "clearConfirm": "确定清空所有本地数据？此操作不可撤销。"
+  },
+  "notFound": {
+    "title": "页面不存在",
+    "backHome": "回到首页"
+  },
+  "editor": {
+    "editProject": "编辑项目",
+    "newProject": "新建项目",
+    "name": "名称",
+    "namePlaceholder": "例如 阅读",
+    "unit": "单位（可选）",
+    "unitPlaceholder": "页 / km / 分钟",
+    "icon": "图标",
+    "color": "颜色",
+    "delete": "删除",
+    "cancel": "取消",
+    "save": "保存",
+    "create": "创建"
+  },
+  "checkin": {
+    "edit": "编辑 · {{date}}",
+    "status": "状态",
+    "done": "✅ 完成",
+    "fail": "❌ 失败",
+    "value": "数值",
+    "unitLabel": "（{{unit}}）",
+    "valuePlaceholder": "留空表示未填写",
+    "note": "备注",
+    "notePlaceholder": "可选",
+    "clear": "清空",
+    "cancel": "取消",
+    "save": "保存"
+  },
+  "conflict": {
+    "title": "同步冲突",
+    "count": "{{count}} 处分歧",
+    "local": "本地",
+    "remote": "远端",
+    "later": "稍后处理",
+    "apply": "应用选择"
+  },
+  "modal": {
+    "close": "关闭"
+  },
+  "chart": {
+    "successCount": "成功次数",
+    "totalValue": "总数值",
+    "totalValueWithUnit": "总数值 ({{unit}})",
+    "monthlyAvg": "月均值"
+  },
+  "common": {
+    "dow": ["日", "一", "二", "三", "四", "五", "六"]
+  }
+}

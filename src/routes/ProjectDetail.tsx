@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ChevronLeft, ChevronDown, RotateCcw, Settings as SettingsIcon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
 import { todayStr } from '@/db/schema'
 import type { Checkin } from '@/db/types'
@@ -54,7 +55,7 @@ function buildPage(pageNum: number): WeekRow[] {
     midDate.setDate(midDate.getDate() + w * 7 + 3)
     const month = midDate.getMonth()
     result.push({
-      monthLabel: prevMonth !== month ? `${midDate.getFullYear()} 年 ${month + 1} 月` : null,
+      monthLabel: prevMonth !== month ? `${midDate.getFullYear()}-${String(month + 1).padStart(2, '0')}` : null,
       days,
     })
     prevMonth = month
@@ -63,6 +64,7 @@ function buildPage(pageNum: number): WeekRow[] {
 }
 
 export function ProjectDetail() {
+  const { t } = useTranslation()
   const { id = '' } = useParams<{ id: string }>()
   const projects = useAppStore(s => s.projects)
   const cycle = useAppStore(s => s.cycleCheckin)
@@ -151,8 +153,8 @@ export function ProjectDetail() {
   if (!project) {
     return (
       <div className="card text-center text-slate-400 py-10">
-        <div>项目不存在</div>
-        <Link to="/" className="btn-ghost mt-3">返回首页</Link>
+        <div>{t('project.notFound')}</div>
+        <Link to="/" className="btn-ghost mt-3">{t('project.backHome')}</Link>
       </div>
     )
   }
@@ -193,7 +195,7 @@ export function ProjectDetail() {
   return (
     <div className="space-y-3">
       <div className="card flex items-center gap-2">
-        <Link to="/" className="btn-ghost p-2" aria-label="返回">
+        <Link to="/" className="btn-ghost p-2" aria-label={t('project.back')}>
           <ChevronLeft size={18} />
         </Link>
         <span className="h-7 w-7 grid place-items-center rounded" style={{ background: project.color + '33' }}>{project.emoji}</span>
@@ -202,10 +204,10 @@ export function ProjectDetail() {
           {project.unit && <div className="text-xs text-slate-500">{project.unit}</div>}
         </div>
         <div className="flex-1" />
-        <button className="btn-ghost p-2" onClick={goToCurrent} aria-label="回到本月">
+        <button className="btn-ghost p-2" onClick={goToCurrent} aria-label={t('project.goToCurrent')}>
           <RotateCcw size={14} />
         </button>
-        <button className="btn-ghost p-2" onClick={() => setEditorOpen(true)} aria-label="项目设置">
+        <button className="btn-ghost p-2" onClick={() => setEditorOpen(true)} aria-label={t('project.settings')}>
           <SettingsIcon size={16} />
         </button>
       </div>
@@ -216,7 +218,7 @@ export function ProjectDetail() {
             className="flex items-center gap-1 text-sm font-semibold text-slate-200 hover:text-brand-500"
             onClick={() => setPickerOpen(v => !v)}
           >
-            {viewYear} 年 {viewMonth} 月
+            {t('project.yearMonth', { year: viewYear, month: viewMonth })}
             <ChevronDown size={14} className={cn('transition-transform', pickerOpen && 'rotate-180')} />
           </button>
           {pickerOpen && (
@@ -231,7 +233,7 @@ export function ProjectDetail() {
                   }}
                 >
                   {Array.from({ length: 11 }, (_, i) => ty - 5 + i).map(y => (
-                    <option key={y} value={y}>{y} 年</option>
+                    <option key={y} value={y}>{t('project.year', { year: y })}</option>
                   ))}
                 </select>
               </div>
@@ -247,7 +249,7 @@ export function ProjectDetail() {
                     )}
                     onClick={() => navigateToMonth(viewYear, m)}
                   >
-                    {m} 月
+                    {t('project.month', { month: m })}
                   </button>
                 ))}
               </div>
@@ -255,7 +257,7 @@ export function ProjectDetail() {
           )}
         </div>
         <div className="grid grid-cols-7 gap-1 text-[10px] text-slate-200 mb-1">
-          {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="text-center">{d}</div>)}
+          {(t('common.dow', { returnObjects: true }) as string[]).map(d => <div key={d} className="text-center">{d}</div>)}
         </div>
         <div
           className="overflow-hidden select-none cursor-grab active:cursor-grabbing"
@@ -280,18 +282,18 @@ export function ProjectDetail() {
 
       {project.unit && (
         <div className="card">
-          <div className="text-sm font-semibold mb-2">数值趋势</div>
+          <div className="text-sm font-semibold mb-2">{t('project.valueTrend')}</div>
           <ValueTrendChart checkins={checkins} color={project.color} currentYear={ty} currentMonth={tm - 1} />
         </div>
       )}
 
       <div className="card">
-        <div className="text-sm font-semibold mb-2">月度统计</div>
+        <div className="text-sm font-semibold mb-2">{t('project.monthlyStats')}</div>
         <MonthlyStatsChart checkins={checkins} color={project.color} currentYear={ty} currentMonth={tm - 1} unit={project.unit} />
       </div>
 
       <Link to={`/history?project=${project.id}`} className="card flex items-center justify-center text-sm text-brand-600 hover:text-brand-500">
-        查看全部历史 →
+        {t('project.viewAllHistory')}
       </Link>
 
       <ProjectEditor

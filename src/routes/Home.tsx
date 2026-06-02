@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
 import { ProjectCard } from '@/components/ProjectCard'
 import { ProjectEditor } from '@/components/ProjectEditor'
@@ -7,6 +8,7 @@ import { shiftDateStr, todayStr } from '@/db/schema'
 import { cn } from '@/lib/cn'
 
 export function Home() {
+  const { t } = useTranslation()
   const projects = useAppStore(s => s.projects)
   const [open, setOpen] = useState(false)
 
@@ -39,7 +41,7 @@ export function Home() {
                   isToday ? 'font-bold text-slate-50' : isFuture ? 'text-slate-300' : 'text-slate-400',
                 )}
               >
-                {'日一二三四五六'[dow]}
+                {(t('common.dow', { returnObjects: true }) as string[])[dow]}
               </div>
             )
           })}
@@ -49,8 +51,8 @@ export function Home() {
       {projects.length === 0 ? (
         <div className="card text-center text-slate-500 py-10">
           <div className="text-2xl mb-2">📝</div>
-          <div className="text-sm">还没有打卡项目</div>
-          <div className="text-xs text-slate-400 mt-1">点击右下角 + 创建一个</div>
+          <div className="text-sm">{t('home.empty')}</div>
+          <div className="text-xs text-slate-400 mt-1">{t('home.emptyHint')}</div>
         </div>
       ) : (
         <div className="space-y-3">
@@ -63,7 +65,7 @@ export function Home() {
       <button
         onClick={() => setOpen(true)}
         className="fixed right-4 bottom-20 z-40 h-12 w-12 rounded-full bg-brand-500 text-slate-50 shadow-lg shadow-brand-500/30 grid place-items-center active:scale-95"
-        aria-label="新建项目"
+        aria-label={t('home.newProject')}
       >
         <Plus size={20} />
       </button>

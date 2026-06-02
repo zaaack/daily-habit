@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/cn'
 
 interface ModalProps {
@@ -12,6 +13,7 @@ interface ModalProps {
 }
 
 export function Modal({ open, onOpenChange, title, children, size = 'md' }: ModalProps) {
+  const { t } = useTranslation()
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -27,7 +29,7 @@ export function Modal({ open, onOpenChange, title, children, size = 'md' }: Moda
           <div className="flex items-start justify-between mb-3">
             <Dialog.Title className="text-base font-semibold">{title}</Dialog.Title>
             <Dialog.Close asChild>
-              <button className="text-slate-400 hover:text-slate-100 p-1" aria-label="关闭">
+              <button className="text-slate-400 hover:text-slate-100 p-1" aria-label={t('modal.close')}>
                 <X size={16} />
               </button>
             </Dialog.Close>

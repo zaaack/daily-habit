@@ -1,0 +1,129 @@
+{
+  "app": {
+    "loading": "Loading…"
+  },
+  "layout": {
+    "syncNow": "Sync now",
+    "settings": "Settings"
+  },
+  "nav": {
+    "home": "Home",
+    "history": "History",
+    "settings": "Settings"
+  },
+  "sync": {
+    "idle": "Idle",
+    "syncing": "Syncing…",
+    "synced": "Synced · {{relative}}",
+    "syncedShort": "Synced",
+    "error": "Sync failed",
+    "conflict": "Conflicts"
+  },
+  "home": {
+    "empty": "No projects yet",
+    "emptyHint": "Tap + at the bottom to create one",
+    "newProject": "New project"
+  },
+  "project": {
+    "notFound": "Project not found",
+    "backHome": "Back to home",
+    "back": "Back",
+    "goToCurrent": "Go to current month",
+    "settings": "Project settings",
+    "yearMonth": "{{month}}/{{year}}",
+    "year": "{{year}}",
+    "month": "{{month}}",
+    "valueTrend": "Value Trend",
+    "monthlyStats": "Monthly Stats",
+    "viewAllHistory": "View all history →",
+    "monthLabel": "{{month}} {{year}}"
+  },
+  "history": {
+    "allProjects": "All projects",
+    "allStatuses": "All statuses",
+    "done": "✅ Done",
+    "fail": "❌ Fail",
+    "searchPlaceholder": "Search project name or note",
+    "count": "{{count}} entries",
+    "exportCsv": "Export CSV",
+    "noMatches": "No matching records"
+  },
+  "settings": {
+    "webdavSync": "WebDAV Sync",
+    "serverUrl": "Server URL (https://…)",
+    "username": "Username",
+    "password": "Password",
+    "remoteDir": "Remote directory",
+    "credentialHint": "Credentials are stored locally (IndexedDB / SQLite)",
+    "testing": "Testing…",
+    "testConnection": "Test Connection",
+    "save": "Save",
+    "syncNow": "Sync now",
+    "savedAt": "Saved at {{time}}",
+    "status": "Status: ",
+    "appearance": "Appearance",
+    "auto": "Auto",
+    "light": "Light",
+    "dark": "Dark",
+    "autoHint": "\"Auto\" follows system settings; can be overridden manually.",
+    "data": "Data",
+    "exportJson": "Export JSON",
+    "importJson": "Import JSON",
+    "clear": "Clear",
+    "invalidFormat": "Invalid file format",
+    "importFailed": "Import failed: {{msg}}",
+    "clearConfirm": "Clear all local data? This action cannot be undone."
+  },
+  "notFound": {
+    "title": "Page not found",
+    "backHome": "Back to home"
+  },
+  "editor": {
+    "editProject": "Edit project",
+    "newProject": "New project",
+    "name": "Name",
+    "namePlaceholder": "e.g. Reading",
+    "unit": "Unit (optional)",
+    "unitPlaceholder": "pages / km / min",
+    "icon": "Icon",
+    "color": "Color",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "save": "Save",
+    "create": "Create"
+  },
+  "checkin": {
+    "edit": "Edit · {{date}}",
+    "status": "Status",
+    "done": "✅ Done",
+    "fail": "❌ Fail",
+    "value": "Value",
+    "unitLabel": " ({{unit}})",
+    "valuePlaceholder": "Leave empty to unset",
+    "note": "Note",
+    "notePlaceholder": "Optional",
+    "clear": "Clear",
+    "cancel": "Cancel",
+    "save": "Save"
+  },
+  "conflict": {
+    "title": "Sync conflict",
+    "count": "{{count}} differences",
+    "local": "Local",
+    "remote": "Remote",
+    "later": "Later",
+    "apply": "Apply"
+  },
+  "modal": {
+    "close": "Close"
+  },
+  "chart": {
+    "successCount": "Success Count",
+    "totalValue": "Total Value",
+    "totalValueWithUnit": "Total Value ({{unit}})",
+    "monthlyAvg": "Monthly Avg"
+  },
+  "common": {
+    "dow": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+  }
+}

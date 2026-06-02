@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
 import { CheckinEditor } from '@/components/CheckinEditor'
 import type { Checkin, CheckStatus } from '@/db/types'
@@ -7,6 +8,7 @@ import { cn } from '@/lib/cn'
 import { format } from 'date-fns'
 
 export function History() {
+  const { t } = useTranslation()
   const projects = useAppStore(s => s.projects)
   const [params, setParams] = useSearchParams()
   const filterProject = params.get('project') ?? ''
@@ -69,25 +71,25 @@ export function History() {
             if (v) params.set('project', v); else params.delete('project')
             setParams(params, { replace: true })
           }}>
-            <option value="">全部项目</option>
+            <option value="">{t('history.allProjects')}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.emoji} {p.name}</option>)}
           </select>
           <select className="input" value={statusFilter} onChange={e => setStatusFilter(e.target.value as 'all' | CheckStatus)}>
-            <option value="all">全部状态</option>
-            <option value="success">✅ 完成</option>
-            <option value="fail">❌ 失败</option>
+            <option value="all">{t('history.allStatuses')}</option>
+            <option value="success">{t('history.done')}</option>
+            <option value="fail">{t('history.fail')}</option>
           </select>
         </div>
-        <input className="input" placeholder="搜索项目名或备注" value={keyword} onChange={e => setKeyword(e.target.value)} />
+        <input className="input" placeholder={t('history.searchPlaceholder')} value={keyword} onChange={e => setKeyword(e.target.value)} />
         <div className="flex items-center justify-between text-xs text-slate-400">
-          <div>共 {filtered.length} 条</div>
-          <button className="btn-ghost" onClick={exportCSV}>导出 CSV</button>
+          <div>{t('history.count', { count: filtered.length })}</div>
+          <button className="btn-ghost" onClick={exportCSV}>{t('history.exportCsv')}</button>
         </div>
       </div>
 
       <div className="card divide-y divide-slate-800 p-0">
         {filtered.length === 0 ? (
-          <div className="text-center text-slate-500 py-8 text-sm">没有匹配的记录</div>
+          <div className="text-center text-slate-500 py-8 text-sm">{t('history.noMatches')}</div>
         ) : (
           filtered.map(c => {
             const p = projectById.get(c.projectId)

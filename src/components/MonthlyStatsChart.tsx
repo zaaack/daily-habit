@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export function MonthlyStatsChart({ checkins, color, currentYear, currentMonth, unit }: Props) {
+  const { t } = useTranslation()
   const [pageOffset, setPageOffset] = useState(0)
 
   const months = useMemo(() => {
@@ -31,7 +33,7 @@ export function MonthlyStatsChart({ checkins, color, currentYear, currentMonth, 
       const m = currentMonth + pageOffset * 12 - 11 + i
       const y = currentYear + Math.floor(m / 12)
       const mo = ((m % 12) + 12) % 12
-      result.push({ year: y, month: mo, label: `${mo + 1}月` })
+      result.push({ year: y, month: mo, label: t('project.month', { month: mo + 1 }) })
     }
     return result
   }, [currentYear, currentMonth, pageOffset])
@@ -83,7 +85,7 @@ export function MonthlyStatsChart({ checkins, color, currentYear, currentMonth, 
     labels,
     datasets: [
       {
-        label: '成功次数',
+        label: t('chart.successCount'),
         data: successValues,
         borderColor: successColor,
         backgroundColor: successColor,
@@ -96,7 +98,7 @@ export function MonthlyStatsChart({ checkins, color, currentYear, currentMonth, 
         yAxisID: 'y',
       },
       {
-        label: unit ? `总数值 (${unit})` : '总数值',
+        label: unit ? t('chart.totalValueWithUnit', { unit }) : t('chart.totalValue'),
         data: valueSumValues,
         borderColor: color,
         backgroundColor: color,
@@ -135,14 +137,14 @@ export function MonthlyStatsChart({ checkins, color, currentYear, currentMonth, 
         position: 'left' as const,
         grid: { color: gridColor },
         ticks: { color: axisColor },
-        title: { display: true, text: '成功次数', color: axisColor },
+        title: { display: true, text: t('chart.successCount'), color: axisColor },
       },
       y1: {
         type: 'linear' as const,
         position: 'right' as const,
         grid: { drawOnChartArea: false },
         ticks: { color: axisColor },
-        title: { display: true, text: unit ? `总数值 (${unit})` : '总数值', color: axisColor },
+        title: { display: true, text: unit ? t('chart.totalValueWithUnit', { unit }) : t('chart.totalValue'), color: axisColor },
       },
     },
   }

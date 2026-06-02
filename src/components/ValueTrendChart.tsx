@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function ValueTrendChart({ checkins, color, currentYear, currentMonth }: Props) {
+  const { t } = useTranslation()
   const [pageOffset, setPageOffset] = useState(0)
 
   const months = useMemo(() => {
@@ -29,7 +31,7 @@ export function ValueTrendChart({ checkins, color, currentYear, currentMonth }: 
       const m = currentMonth + pageOffset * 12 - 11 + i
       const y = currentYear + Math.floor(m / 12)
       const mo = ((m % 12) + 12) % 12
-      result.push({ year: y, month: mo, label: `${mo + 1}月` })
+      result.push({ year: y, month: mo, label: t('project.month', { month: mo + 1 }) })
     }
     return result
   }, [currentYear, currentMonth, pageOffset])
@@ -67,7 +69,7 @@ export function ValueTrendChart({ checkins, color, currentYear, currentMonth }: 
     labels,
     datasets: [
       {
-        label: '月均值',
+        label: t('chart.monthlyAvg'),
         data: values,
         borderColor: color,
         backgroundColor: color + '33',
