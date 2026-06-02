@@ -2,8 +2,20 @@ name: Deploy Web to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    tags:
+      - 'v*'
   workflow_dispatch:
+    inputs:
+      deploy-pages:
+        description: 'Deploy to GitHub Pages'
+        required: false
+        default: true
+        type: boolean
+      deploy-cloudflare:
+        description: 'Deploy to Cloudflare Workers'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -41,11 +53,13 @@ jobs:
           path: docs
 
       - name: Trigger Cloudflare Workers deploy hook
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.deploy-cloudflare == 'true'
         run: curl -fsS -X POST "${{ secrets.CF_BUILD_TOKEN }}"
         continue-on-error: true
 
   deploy:
     needs: build
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.deploy-pages == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

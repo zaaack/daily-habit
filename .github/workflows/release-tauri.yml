@@ -5,6 +5,12 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      targets:
+        description: '要构建的目标（逗号分隔，如 android,linux,macos,windows）留空则构建全部'
+        required: false
+        default: 'android,linux,macos,windows'
+        type: string
 
 permissions:
   contents: write
@@ -16,6 +22,7 @@ concurrency:
 jobs:
   # ── Android (Tauri) ──────────────────────────────────────────────────
   build-android:
+    if: github.event_name == 'push' || contains(github.event.inputs.targets || '', 'android')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,10 +56,16 @@ jobs:
 
       - name: Install NDK
         run: |
-          NDK_VERSION="27.0.12077973"
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;${NDK_VERSION}" > /dev/null 2>&1 || true
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+          NDK_DIR=$(ls -d "$ANDROID_HOME/ndk"/*/ 2>/dev/null | head -1)
+          if [ -z "$NDK_DIR" ]; then
+            echo "No NDK found, installing latest..."
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk" > /dev/null 2>&1 || true
+            NDK_DIR=$(ls -d "$ANDROID_HOME/ndk"/*/ 2>/dev/null | head -1)
+          fi
+          if [ -n "$NDK_DIR" ]; then
+            echo "ANDROID_NDK_HOME=${NDK_DIR%/}" >> "$GITHUB_ENV"
+          fi
 
       - name: Cache Cargo (Android)
         uses: actions/cache@v4
@@ -78,6 +91,7 @@ jobs:
 
   # ── Desktop (Linux / macOS / Windows) ───────────────────────────────
   build-desktop:
+    if: github.event_name == 'push' || contains(github.event.inputs.targets || '', matrix.target)
     strategy:
       fail-fast: false
       matrix:
@@ -149,10 +163,13 @@ jobs:
   create-release:
     needs: [build-android, build-desktop]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: ${{ always() && startsWith(github.ref, 'refs/tags/') }}
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: daily-habit-*
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
