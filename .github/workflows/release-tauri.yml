@@ -1,6 +1,6 @@
 name: Build and Release Tauri Apps
 
-on:
+'on':
   push:
     tags:
       - 'v*'
@@ -20,8 +20,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── Android ──────────────────────────────────────────────────────────
+  # ── Create Release ──────────────────────────────────────────────────
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create-release.outputs.result }}
+      version: ${{ steps.get-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Get version
+        id: get-version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION=$(node -p "require('./package.json').version")
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        id: create-release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: `v${process.env.VERSION}`,
+              name: `Daily Habit v${process.env.VERSION}`,
+              body: 'Take a look at the assets to download and install this app.',
+              draft: true,
+              prerelease: false
+            })
+            return data.id
+        env:
+          VERSION: ${{ steps.get-version.outputs.version }}
+
+  # ── Android ─────────────────────────────────────────────────────────
   build-android:
+    needs: create-release
     if: github.event_name == 'push' || contains(github.event.inputs.targets || '', 'android')
     runs-on: ubuntu-latest
     steps:
@@ -39,10 +81,11 @@ jobs:
       - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install system dependencies (Linux)
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential curl wget file libssl-dev libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
+          sudo apt-get install -y build-essential curl wget file libssl-dev libgtk-3-dev \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -77,36 +120,67 @@ jobs:
             echo "ANDROID_NDK_HOME=${NDK_DIR%/}" >> "$GITHUB_ENV"
           fi
 
-      - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          mobile: android
-          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
-          releaseName: 'Daily Habit ${{ github.ref_name }}'
-          prerelease: ${{ contains(github.ref_name, '-') }}
-          generateReleaseNotes: true
+      - name: Build Android APK
+        run: pnpm tauri:android:build
 
-  # ── Desktop (Linux / macOS / Windows) ───────────────────────────────
+      - name: Upload APK to Release
+        uses: actions/github-script@v7
+        env:
+          release_id: ${{ needs.create-release.outputs.release_id }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const glob = require('glob') || null;
+
+            async function findFiles(pattern) {
+              const { globSync } = await import('glob');
+              return globSync(pattern);
+            }
+
+            const apkDir = 'src-tauri/gen/android/app/build/outputs/apk';
+            const files = [];
+
+            function walkDir(dir) {
+              if (!fs.existsSync(dir)) return;
+              for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) walkDir(full);
+                else if (entry.name.endsWith('.apk')) files.push(full);
+              }
+            }
+            walkDir(apkDir);
+
+            for (const file of files) {
+              const data = fs.readFileSync(file);
+              await github.rest.repos.uploadReleaseAsset({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: parseInt(process.env.release_id),
+                name: path.basename(file),
+                data,
+              });
+              console.log(`Uploaded: ${file}`);
+            }
+
+  # ── Desktop (Linux / macOS / Windows) ──────────────────────────────
   build-desktop:
+    needs: create-release
     if: github.event_name == 'push' || github.event.inputs.targets != ''
     strategy:
       fail-fast: false
       matrix:
         include:
-          - target: linux
-            runner: ubuntu-latest
-            system-deps: |
-              sudo apt-get update &&
-              sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev patchelf
+          - platform: ubuntu-22.04
+            args: ''
+          - platform: macos-latest
+            args: '--target aarch64-apple-darwin'
+          - platform: macos-latest
+            args: '--target x86_64-apple-darwin'
+          - platform: windows-latest
+            args: ''
 
-          - target: macos
-            runner: macos-latest
-
-          - target: windows
-            runner: windows-latest
-
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
@@ -122,20 +196,49 @@ jobs:
       - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install system dependencies (Linux)
-        if: matrix.target == 'linux'
-        run: ${{ matrix.system-deps }}
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
         with:
-          workspaces: './src-tauri -> target'
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
-      - uses: tauri-apps/tauri-action@v0
+      - name: Install system dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Build and upload to Release
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
-          releaseName: 'Daily Habit ${{ github.ref_name }}'
-          prerelease: ${{ contains(github.ref_name, '-') }}
-          generateReleaseNotes: true
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          args: ${{ matrix.args }}
+
+  # ── Publish Release ────────────────────────────────────────────────
+  publish-release:
+    needs: [create-release, build-desktop, build-android]
+    if: always() && needs.create-release.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        uses: actions/github-script@v7
+        env:
+          release_id: ${{ needs.create-release.outputs.release_id }}
+          desktop_result: ${{ needs.build-desktop.result }}
+          android_result: ${{ needs.build-android.result }}
+        with:
+          script: |
+            const success = ['success', 'skipped'];
+            if (!success.includes(process.env.desktop_result) && !success.includes(process.env.android_result)) {
+              core.setFailed('All build jobs failed or were cancelled.');
+              return;
+            }
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: parseInt(process.env.release_id),
+              draft: false,
+              prerelease: false
+            });
+            console.log('Release published successfully!');
