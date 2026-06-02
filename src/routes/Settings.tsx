@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
-import { getSyncConfig, setSyncConfig, testConnection, syncOneProject, makeRemotePath } from '@/sync/fullSync'
+import { getSyncConfig, setSyncConfig, testConnection, syncOneProject, makeRemotePath, cleanupDeletedProjects } from '@/sync/fullSync'
 import type { WebDavConfig } from '@/sync/webdav'
 import type { ProjectFile } from '@/sync/merge'
+import type { Checkin } from '@/db/types'
 import { DEFAULT_REMOTE_DIR, makeProjectId, PROJECT_COLORS } from '@/db/schema'
 import { getRepo } from '@/db'
 import { Download, Upload, Trash2, Sun, Moon, Monitor } from 'lucide-react'
@@ -27,10 +28,12 @@ export function Settings() {
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [theme, setTheme] = useState<ThemeMode>('auto')
+  const [importing, setImporting] = useState<{ current: number; total: number } | null>(null)
+  const [cleaning, setCleaning] = useState(false)
 
   useEffect(() => {
     void (async () => {
-      const c = await getSyncConfig(await getRepo())
+      const c = getSyncConfig()
       if (c) setCfg(c)
     })()
     try {
@@ -45,7 +48,7 @@ export function Settings() {
   }
 
   async function saveCfg() {
-    await setSyncConfig(await getRepo(), cfg)
+    setSyncConfig(cfg)
     setSavedAt(Date.now())
   }
 
@@ -100,17 +103,32 @@ export function Settings() {
         return
       }
       const repo = await getRepo()
+      const total = data.filter(item => item.project?.id).length
+      setImporting({ current: 0, total })
+      let processed = 0
       for (const item of data) {
         if (!item.project?.id) continue
         await repo.upsertProject({ ...item.project, remoteEtag: null, remotePath: makeRemotePath(item.project.id) })
+        const checkins: Checkin[] = []
         for (const c of item.checkins) {
-          await repo.upsertCheckin({ projectId: item.project.id, date: c.d, status: c.s, value: c.v, note: c.n, updatedAt: c.u })
+          checkins.push({ projectId: item.project.id, date: c.d, status: c.s, value: c.v, note: c.n, updatedAt: c.u })
         }
+        if (checkins.length > 0) await repo.bulkUpsertCheckins(checkins)
+        processed++
+        setImporting({ current: processed, total })
       }
       const projects = await repo.listProjects()
       useAppStore.setState({ projects })
       for (const p of projects) void syncOneProject(p.id).catch(() => {})
+      await useAppStore.getState().triggerSync()
+      setImporting(null)
+      if (useAppStore.getState().sync.status === 'error') {
+        alert(t('settings.syncFailed', { msg: useAppStore.getState().sync.error ?? '' }))
+      } else {
+        alert(t('settings.importSuccess'))
+      }
     } catch (e) {
+      setImporting(null)
       alert(t('settings.importFailed', { msg: e instanceof Error ? e.message : String(e) }))
     }
   }
@@ -118,12 +136,25 @@ export function Settings() {
   async function handleClear() {
     if (!confirm(t('settings.clearConfirm'))) return
     const repo = await getRepo()
-    for (const p of await repo.listProjects(true)) {
-      const cs = await repo.getCheckins(p.id)
-      for (const c of cs) await repo.deleteCheckin(p.id, c.date)
-      await repo.softDeleteProject(p.id, Date.now())
+    await repo.clearDatabase()
+    useAppStore.setState({ projects: [], conflicts: {} })
+  }
+
+  async function handleCleanDeleted() {
+    if (!confirm(t('settings.cleanDeletedConfirm'))) return
+    setCleaning(true)
+    try {
+      const result = await cleanupDeletedProjects()
+      if (result === null) {
+        alert(t('settings.noSyncConfig'))
+      } else {
+        alert(t('settings.cleanDeletedDone', { count: result.cleaned }))
+      }
+    } catch (e) {
+      alert(t('settings.cleanDeletedFailed', { msg: e instanceof Error ? e.message : String(e) }))
+    } finally {
+      setCleaning(false)
     }
-    useAppStore.setState({ projects: [] })
   }
 
   function epochDayToDateStr(epochDay: number): string {
@@ -137,15 +168,21 @@ export function Settings() {
   async function importMhabit(habits: unknown[]) {
     const repo = await getRepo()
     const now = Date.now()
+    const total = habits.filter(h => { const habit = h as Record<string, unknown>; return String(habit.name ?? '') !== '' }).length
+    setImporting({ current: 0, total })
+    let processed = 0
     for (const h of habits) {
       const habit = h as Record<string, unknown>
       const name = String(habit.name ?? '')
       if (!name) continue
       const id = makeProjectId()
       const colorIdx = Math.min(Math.max(((habit.color as number) ?? 1) - 1, 0), PROJECT_COLORS.length - 1)
+//  忽略非进行中项目      
+      if (((habit.status as number) ?? 1) !== 1) continue
       await repo.upsertProject({
         id,
         name,
+        description: habit.desc,
         unit: (habit.daily_goal_unit as string) || null,
         emoji: '📌',
         color: PROJECT_COLORS[colorIdx],
@@ -157,25 +194,38 @@ export function Settings() {
         deleted: ((habit.status as number) ?? 1) === 1 ? 0 : 1,
       })
       const records = (habit.records as unknown[]) ?? []
-      for (const r of records) {
-        const rec = r as Record<string, unknown>
-        const recordDate = (rec.record_date as number) ?? 0
-        const reason = (rec.reason as string) ?? ''
-        const note = (rec.note as string) ?? ''
-        const combinedNote = reason && note ? `${reason} | ${note}` : (reason || note || null)
-        await repo.upsertCheckin({
-          projectId: id,
-          date: epochDayToDateStr(recordDate),
-          status: ((rec.record_type as number) ?? 1) === 1 ? 'success' : 'fail',
-          value: (rec.record_value as number | null) ?? null,
-          note: combinedNote,
-          updatedAt: ((rec.modify_t as number) ?? Math.floor(now / 1000)) * 1000,
-        })
+      if (records.length > 0) {
+        const checkins: Checkin[] = []
+        for (const r of records) {
+          const rec = r as Record<string, unknown>
+          const recordDate = (rec.record_date as number) ?? 0
+          const reason = (rec.reason as string) ?? ''
+          const note = (rec.note as string) ?? ''
+          const combinedNote = reason && note ? `${reason} | ${note}` : (reason || note || null)
+          checkins.push({
+            projectId: id,
+            date: epochDayToDateStr(recordDate),
+            status: ((rec.record_value as number) ?? 1) === 1 ? 'success' : 'fail',
+            value: (rec.record_value as number | null) ?? null,
+            note: combinedNote,
+            updatedAt: ((rec.modify_t as number) ?? Math.floor(now / 1000)) * 1000,
+          })
+        }
+        await repo.bulkUpsertCheckins(checkins)
       }
+      processed++
+      setImporting({ current: processed, total })
     }
     const projects = await repo.listProjects()
     useAppStore.setState({ projects })
     for (const p of projects) void syncOneProject(p.id).catch(() => {})
+    await useAppStore.getState().triggerSync()
+    setImporting(null)
+    if (useAppStore.getState().sync.status === 'error') {
+      alert(t('settings.syncFailed', { msg: useAppStore.getState().sync.error ?? '' }))
+    } else {
+      alert(t('settings.importSuccess'))
+    }
   }
 
   return (
@@ -204,6 +254,11 @@ export function Settings() {
         <div className="text-xs text-slate-500 pt-1 border-t border-slate-800">
           {t('settings.status')}{sync.status} {sync.at && `· ${format(new Date(sync.at), 'MM-dd HH:mm')}`}
           {sync.error && <div className="text-rose-500 mt-1">{sync.error}</div>}
+        </div>
+        <div className="pt-1">
+          <button className="btn-outline text-xs" onClick={handleCleanDeleted} disabled={cleaning}>
+            {cleaning ? '…' : <Trash2 size={14} />} {t('settings.cleanDeleted')}
+          </button>
         </div>
       </div>
 
@@ -235,6 +290,15 @@ export function Settings() {
           </button>
         </div>
       </div>
+
+      {importing && (
+        <div className="card space-y-2">
+          <div className="text-sm font-semibold">{t('settings.importing', importing)}</div>
+          <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+            <div className="h-full bg-brand-500 transition-all duration-300 rounded-full" style={{ width: `${(importing.current / importing.total) * 100}%` }} />
+          </div>
+        </div>
+      )}
 
       <div className="text-center text-[11px] text-slate-500 pt-2">Daily Habit · v0.0.1</div>
     </div>

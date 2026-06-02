@@ -8,17 +8,27 @@ function sortProjects(projects: Project[]): Project[] {
   return [...projects].sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0) || b.updatedAt - a.updatedAt)
 }
 
+interface FilterState {
+  normal: boolean
+  archived: boolean
+  deleted: boolean
+}
+
 interface AppState {
   ready: boolean
   projects: Project[]
   sync: SyncState
   conflicts: Record<string, ConflictItem[]>
+  filterState: FilterState
 
   init(): Promise<void>
 
-  addProject(input: { name: string; unit: string | null; emoji: string; color: string }): Promise<Project>
-  updateProject(id: string, patch: Partial<Pick<Project, 'name' | 'unit' | 'emoji' | 'color'>>): Promise<void>
+  addProject(input: { name: string; description?: string; unit: string | null; emoji: string; color: string }): Promise<Project>
+  updateProject(id: string, patch: Partial<Pick<Project, 'name' | 'description' | 'unit' | 'emoji' | 'color'>>): Promise<void>
   deleteProject(id: string): Promise<void>
+  restoreProject(id: string): Promise<void>
+  archiveProject(id: string): Promise<void>
+  unarchiveProject(id: string): Promise<void>
 
   cycleCheckin(projectId: string, date: string): Promise<void>
   setCheckin(projectId: string, date: string, status: CheckStatus | null, value: number | null, note: string | null): Promise<void>
@@ -27,6 +37,7 @@ interface AppState {
   reorderProjects(orderedIds: string[]): Promise<void>
   resolveConflict(projectId: string, items: ConflictItem[]): Promise<void>
   clearConflict(projectId: string): Promise<void>
+  setFilterState(state: FilterState): void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -34,6 +45,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   projects: [],
   sync: { status: 'idle', at: null, error: null, pending: 0 },
   conflicts: {},
+  filterState: { normal: true, archived: false, deleted: false },
 
   async init() {
     try {
@@ -60,13 +72,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  async addProject({ name, unit, emoji, color }) {
+  async addProject({ name, description, unit, emoji, color }) {
     const repo = await getRepo()
     const now = nowMs()
     const id = makeProjectId()
     const project: Project = {
       id,
       name: name.trim(),
+      description: description?.trim() ?? '',
       unit: unit?.trim() || null,
       emoji,
       color,
@@ -76,6 +89,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       remoteEtag: null,
       remotePath: makeRemotePath(id, DEFAULT_REMOTE_DIR),
       deleted: 0,
+      archived: 0,
     }
     await repo.upsertProject(project)
     set(s => ({ projects: sortProjects([project, ...s.projects]) }))
@@ -102,6 +116,39 @@ export const useAppStore = create<AppState>((set, get) => ({
       const next: Project = { ...cur, deleted: 1, updatedAt: now }
       set(s => ({ projects: s.projects.map(p => p.id === id ? next : p) }))
     }
+    void get().triggerSync()
+  },
+
+  async restoreProject(id) {
+    const repo = await getRepo()
+    const cur = await repo.getProject(id)
+    if (!cur) return
+    const now = nowMs()
+    const next: Project = { ...cur, deleted: 0, updatedAt: now }
+    await repo.upsertProject(next)
+    set(s => ({ projects: sortProjects(s.projects.map(p => p.id === id ? next : p)) }))
+    void get().triggerSync()
+  },
+
+  async archiveProject(id) {
+    const repo = await getRepo()
+    const cur = await repo.getProject(id)
+    if (!cur) return
+    const now = nowMs()
+    const next: Project = { ...cur, archived: 1, updatedAt: now }
+    await repo.upsertProject(next)
+    set(s => ({ projects: sortProjects(s.projects.map(p => p.id === id ? next : p)) }))
+    void get().triggerSync()
+  },
+
+  async unarchiveProject(id) {
+    const repo = await getRepo()
+    const cur = await repo.getProject(id)
+    if (!cur) return
+    const now = nowMs()
+    const next: Project = { ...cur, archived: 0, updatedAt: now }
+    await repo.upsertProject(next)
+    set(s => ({ projects: sortProjects(s.projects.map(p => p.id === id ? next : p)) }))
     void get().triggerSync()
   },
 
@@ -174,7 +221,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     for (const p of next) {
       if (idSort.has(p.id)) await repo.upsertProject(p)
     }
-    set({ projects: next })
+    set({ projects: sortProjects(next) })
     void get().triggerSync()
   },
 
@@ -217,6 +264,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       delete c[projectId]
       return { conflicts: c }
     })
+  },
+
+  setFilterState(state) {
+    set({ filterState: state })
   },
 }))
 

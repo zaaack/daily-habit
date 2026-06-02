@@ -22,7 +22,17 @@
   "home": {
     "empty": "还没有打卡项目",
     "emptyHint": "点击右下角 + 创建一个",
-    "newProject": "新建项目"
+    "newProject": "新建项目",
+    "failRate": "{{rate}}%",
+    "showDeleted": "查看已删除",
+    "hideDeleted": "收起已删除",
+    "deletedProjects": "已删除的项目",
+    "restore": "恢复",
+    "filter": "筛选",
+    "filterTitle": "显示项目",
+    "statusNormal": "正常",
+    "statusArchived": "已归档",
+    "statusDeleted": "已删除"
   },
   "project": {
     "notFound": "项目不存在",
@@ -72,8 +82,16 @@
     "importMhabit": "导入 mhabit",
     "clear": "清空",
     "invalidFormat": "文件格式不正确",
+    "importing": "正在导入 {{current}}/{{total}} …",
+    "importSuccess": "导入成功",
     "importFailed": "导入失败：{{msg}}",
-    "clearConfirm": "确定清空所有本地数据？此操作不可撤销。"
+    "syncFailed": "同步失败：{{msg}}",
+    "clearConfirm": "确定清空所有本地数据？此操作不可撤销。",
+    "noSyncConfig": "未配置 WebDAV 同步",
+    "cleanDeleted": "清理已删除项目",
+    "cleanDeletedConfirm": "确定要将 WebDAV 上已删除超过 90 天的项目内容清空？",
+    "cleanDeletedDone": "已清理 {{count}} 个已删除项目",
+    "cleanDeletedFailed": "清理失败：{{msg}}"
   },
   "notFound": {
     "title": "页面不存在",
@@ -84,14 +102,19 @@
     "newProject": "新建项目",
     "name": "名称",
     "namePlaceholder": "例如 阅读",
+    "description": "描述（可选）",
+    "descriptionPlaceholder": "项目简介、目标等",
     "unit": "单位（可选）",
     "unitPlaceholder": "页 / km / 分钟",
     "icon": "图标",
     "color": "颜色",
     "delete": "删除",
+    "deleteConfirm": "确定要删除「{{name}}」吗？此操作不可撤销。",
     "cancel": "取消",
     "save": "保存",
-    "create": "创建"
+    "create": "创建",
+    "archive": "归档",
+    "unarchive": "取消归档"
   },
   "checkin": {
     "edit": "编辑 · {{date}}",
@@ -120,6 +143,7 @@
   },
   "chart": {
     "successCount": "成功次数",
+    "failCount": "失败次数",
     "totalValue": "总数值",
     "totalValueWithUnit": "总数值 ({{unit}})",
     "monthlyAvg": "月均值"

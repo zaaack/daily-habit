@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, ChevronDown, RotateCcw, Settings as SettingsIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
@@ -66,6 +66,7 @@ function buildPage(pageNum: number): WeekRow[] {
 export function ProjectDetail() {
   const { t } = useTranslation()
   const { id = '' } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const projects = useAppStore(s => s.projects)
   const cycle = useAppStore(s => s.cycleCheckin)
   const project = useMemo(() => projects.find(p => p.id === id), [projects, id])
@@ -81,6 +82,8 @@ export function ProjectDetail() {
   const startY = useRef(0)
   const [pageH, setPageH] = useState(0)
   const currRef = useRef<HTMLDivElement>(null)
+  const calendarRef = useRef<HTMLDivElement>(null)
+  const wheelTimer = useRef<ReturnType<typeof setTimeout>>()
 
   const pages = useMemo(() => ({
     prev: buildPage(pageNum - 1),
@@ -123,6 +126,20 @@ export function ProjectDetail() {
     dragging.current = false
     snapToPage(e.clientY - startY.current)
   }, [snapToPage])
+
+  useEffect(() => {
+    const el = calendarRef.current
+    if (!el) return
+    const handler = (e: WheelEvent) => {
+      e.preventDefault()
+      if (wheelTimer.current) return
+      const dir = e.deltaY > 0 ? 1 : -1
+      setPageNum(p => p + dir)
+      wheelTimer.current = setTimeout(() => { wheelTimer.current = undefined }, 400)
+    }
+    el.addEventListener('wheel', handler, { passive: false })
+    return () => el.removeEventListener('wheel', handler)
+  }, [])
 
   const goToCurrent = useCallback(() => {
     setPageNum(0)
@@ -201,12 +218,15 @@ export function ProjectDetail() {
         <span className="h-7 w-7 grid place-items-center rounded" style={{ background: project.color + '33' }}>{project.emoji}</span>
         <div>
           <div className="font-semibold">{project.name}</div>
+          {project.description && <div className="text-xs text-slate-400 mt-0.5">{project.description}</div>}
           {project.unit && <div className="text-xs text-slate-500">{project.unit}</div>}
         </div>
         <div className="flex-1" />
-        <button className="btn-ghost p-2" onClick={goToCurrent} aria-label={t('project.goToCurrent')}>
-          <RotateCcw size={14} />
-        </button>
+        {pageNum !== 0 && (
+          <button className="btn-ghost p-2" onClick={goToCurrent} aria-label={t('project.goToCurrent')}>
+            <RotateCcw size={14} />
+          </button>
+        )}
         <button className="btn-ghost p-2" onClick={() => setEditorOpen(true)} aria-label={t('project.settings')}>
           <SettingsIcon size={16} />
         </button>
@@ -268,6 +288,7 @@ export function ProjectDetail() {
           {(t('common.dow', { returnObjects: true }) as string[]).map(d => <div key={d} className="text-center">{d}</div>)}
         </div>
         <div
+          ref={calendarRef}
           className="overflow-hidden select-none cursor-grab active:cursor-grabbing"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -288,18 +309,16 @@ export function ProjectDetail() {
         </div>
       </div>
 
-      {project.unit && (
-        <div className="card">
-          <div className="text-sm font-semibold mb-2">{t('project.valueTrend')}</div>
-          <ValueTrendChart checkins={checkins} color={project.color} currentYear={ty} currentMonth={tm - 1} />
-        </div>
-      )}
+  
 
       <div className="card">
         <div className="text-sm font-semibold mb-2">{t('project.monthlyStats')}</div>
         <MonthlyStatsChart checkins={checkins} color={project.color} currentYear={ty} currentMonth={tm - 1} unit={project.unit} />
       </div>
-
+      <div className="card">
+          <div className="text-sm font-semibold mb-2">{t('project.valueTrend')}</div>
+          <ValueTrendChart checkins={checkins} color={project.color} currentYear={ty} currentMonth={tm - 1} />
+        </div>
       <Link to={`/history?project=${project.id}`} className="card flex items-center justify-center text-sm text-brand-600 hover:text-brand-500">
         {t('project.viewAllHistory')}
       </Link>
@@ -307,7 +326,8 @@ export function ProjectDetail() {
       <ProjectEditor
         open={editorOpen}
         onOpenChange={setEditorOpen}
-        initial={{ id: project.id, name: project.name, unit: project.unit, emoji: project.emoji, color: project.color }}
+        initial={{ id: project.id, name: project.name, description: project.description, unit: project.unit, emoji: project.emoji, color: project.color }}
+        onDelete={() => navigate('/')}
       />
     </div>
   )

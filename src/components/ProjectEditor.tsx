@@ -11,6 +11,7 @@ interface Props {
   initial?: {
     id?: string
     name?: string
+    description?: string
     unit?: string | null
     emoji?: string
     color?: string
@@ -23,12 +24,19 @@ export function ProjectEditor({ open, onOpenChange, initial, onDelete }: Props) 
   const addProject = useAppStore(s => s.addProject)
   const updateProject = useAppStore(s => s.updateProject)
   const deleteProject = useAppStore(s => s.deleteProject)
+  const restoreProject = useAppStore(s => s.restoreProject)
+  const archiveProject = useAppStore(s => s.archiveProject)
+  const unarchiveProject = useAppStore(s => s.unarchiveProject)
+
+  const currentProject = initial?.id ? useAppStore(s => s.projects.find(p => p.id === initial.id)) : undefined
 
   const [name, setName] = useState(initial?.name ?? '')
+  const [description, setDescription] = useState(initial?.description ?? '')
   const [unit, setUnit] = useState(initial?.unit ?? '')
   const [emoji, setEmoji] = useState(initial?.emoji ?? PROJECT_EMOJIS[0])
   const [color, setColor] = useState(initial?.color ?? PROJECT_COLORS[0])
   const [busy, setBusy] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const isEdit = !!initial?.id
 
@@ -37,9 +45,9 @@ export function ProjectEditor({ open, onOpenChange, initial, onDelete }: Props) 
     setBusy(true)
     try {
       if (isEdit && initial?.id) {
-        await updateProject(initial.id, { name: name.trim(), unit: unit.trim() || null, emoji, color })
+        await updateProject(initial.id, { name: name.trim(), description: description.trim(), unit: unit.trim() || null, emoji, color })
       } else {
-        await addProject({ name: name.trim(), unit: unit.trim() || null, emoji, color })
+        await addProject({ name: name.trim(), description: description.trim(), unit: unit.trim() || null, emoji, color })
       }
       onOpenChange(false)
     } finally { setBusy(false) }
@@ -55,6 +63,15 @@ export function ProjectEditor({ open, onOpenChange, initial, onDelete }: Props) 
         <div>
           <div className="label mb-1">{t('editor.name')}</div>
           <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder={t('editor.namePlaceholder')} />
+        </div>
+        <div>
+          <div className="label mb-1">{t('editor.description')}</div>
+          <textarea
+            className="input resize-none min-h-[60px]"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder={t('editor.descriptionPlaceholder')}
+          />
         </div>
         <div>
           <div className="label mb-1">{t('editor.unit')}</div>
@@ -94,22 +111,67 @@ export function ProjectEditor({ open, onOpenChange, initial, onDelete }: Props) 
         </div>
 
         <div className="flex items-center gap-2 pt-2">
-          {isEdit && onDelete && initial?.id && (
-            <button
-              className="btn-outline text-rose-400 border-rose-900/40 hover:bg-rose-900/20"
-              onClick={async () => {
-                if (!initial.id) return
-                await deleteProject(initial.id)
-                onDelete(initial.id)
-                onOpenChange(false)
-              }}
-            >{t('editor.delete')}</button>
+          {isEdit && onDelete && initial?.id && !confirmDelete && (
+            <div className="flex items-center gap-2">
+              {currentProject?.deleted ? (
+                <button
+                  className="btn-outline text-brand-400 border-brand-900/40 hover:bg-brand-900/20"
+                  onClick={async () => {
+                    if (!initial.id) return
+                    await restoreProject(initial.id)
+                    onOpenChange(false)
+                  }}
+                >{t('home.restore')}</button>
+              ) : (<>
+                {currentProject?.archived ? (
+                  <button
+                    className="btn-outline"
+                    onClick={async () => {
+                      if (!initial.id) return
+                      await unarchiveProject(initial.id)
+                      onOpenChange(false)
+                    }}
+                  >{t('editor.unarchive')}</button>
+                ) : (
+                  <button
+                    className="btn-outline"
+                    onClick={async () => {
+                      if (!initial.id) return
+                      await archiveProject(initial.id)
+                      onOpenChange(false)
+                    }}
+                  >{t('editor.archive')}</button>
+                )}
+                <button
+                  className="btn-outline text-rose-400 border-rose-900/40 hover:bg-rose-900/20"
+                  onClick={() => setConfirmDelete(true)}
+                >{t('editor.delete')}</button>
+              </>)}
+            </div>
           )}
-          <div className="flex-1" />
+          {isEdit && confirmDelete && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-rose-400">{t('editor.deleteConfirm', { name: name || initial?.name })}</span>
+              <button
+                className="btn-outline"
+                onClick={() => setConfirmDelete(false)}
+              >{t('editor.cancel')}</button>
+              <button
+                className="btn-primary bg-rose-600 hover:bg-rose-500"
+                onClick={async () => {
+                  if (!initial.id) return
+                  await deleteProject(initial.id)
+                  onDelete?.(initial.id)
+                  onOpenChange(false)
+                }}
+              >{t('editor.delete')}</button>
+            </div>
+          )}
+          {!confirmDelete && <><div className="flex-1" />
           <button className="btn-ghost" onClick={() => onOpenChange(false)}>{t('editor.cancel')}</button>
           <button className="btn-primary" disabled={busy || !name.trim()} onClick={handleSubmit}>
             {isEdit ? t('editor.save') : t('editor.create')}
-          </button>
+          </button></>}
         </div>
       </div>
     </Modal>

@@ -6,14 +6,22 @@ import { makeRemotePath } from '@/db/schema'
 
 const SYNC_CONFIG_KEY = 'webdav.config'
 
-export async function getSyncConfig(repo: Repo): Promise<WebDavConfig | null> {
-  const v = await repo.getKV<WebDavConfig>(SYNC_CONFIG_KEY)
-  if (!v || !v.url || !v.username) return null
-  return { ...v, remoteDir: normalizeDir(v.remoteDir || '/dailies') }
+export function getSyncConfig(): WebDavConfig | null {
+  try {
+    const raw = localStorage.getItem(SYNC_CONFIG_KEY)
+    if (!raw) return null
+    const v = JSON.parse(raw) as WebDavConfig
+    if (!v || !v.url || !v.username) return null
+    return { ...v, remoteDir: normalizeDir(v.remoteDir || '/dailies') }
+  } catch {
+    return null
+  }
 }
 
-export async function setSyncConfig(repo: Repo, cfg: WebDavConfig): Promise<void> {
-  await repo.setKV(SYNC_CONFIG_KEY, { ...cfg, remoteDir: normalizeDir(cfg.remoteDir) })
+export function setSyncConfig(cfg: WebDavConfig): void {
+  try {
+    localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify({ ...cfg, remoteDir: normalizeDir(cfg.remoteDir) }))
+  } catch { /* noop */ }
 }
 
 export async function testConnection(cfg: WebDavConfig): Promise<{ ok: boolean; message: string }> {
@@ -33,25 +41,34 @@ export async function runFullSync(
   repo: Repo,
   hooks: { onConflict: (projectId: string, items: import('@/db/types').ConflictItem[]) => void; onProjectsChange: (projects: Project[]) => void } = { onConflict: () => {}, onProjectsChange: () => {} },
 ): Promise<void> {
-  const cfg = await getSyncConfig(repo)
+  const cfg = getSyncConfig()
   if (!cfg) return
   const client = getClient(cfg)
+  console.log('[sync] runFullSync start, remoteDir:', cfg.remoteDir)
 
   // 1. 列出远端
   let remoteFiles: { filename: string; etag: string | null }[] = []
   try {
-    const list = await client.getDirectoryContents(cfg.remoteDir) as { data?: { filename?: string; etag?: string | null }[] }
-    const data = (list?.data ?? []) as { filename?: string; etag?: string | null; type?: string }[]
-    remoteFiles = data
-      .filter(f => f.type !== 'directory' && f.filename?.endsWith('.json'))
-      .map(f => ({ filename: f.filename!, etag: f.etag ?? null }))
+    const list = await client.getDirectoryContents(cfg.remoteDir)
+    const items = Array.isArray(list) ? list : ((list as any)?.data ?? [])
+    console.log('[sync] getDirectoryContents raw:', JSON.stringify(list, null, 2).slice(0, 2000))
+    console.log('[sync] getDirectoryContents items:', JSON.stringify(items, null, 2).slice(0, 2000))
+    remoteFiles = items
+      .filter((f: any) => f.type !== 'directory' && f.filename?.endsWith('.json'))
+      .map((f: any) => ({ filename: f.basename!, etag: f.etag ?? null }))
+    console.log('[sync] remoteFiles (after filter):', JSON.stringify(remoteFiles))
   } catch (e) {
+    console.warn('[sync] getDirectoryContents failed:', e)
     // 远端目录不存在 → 创建
     try { await client.createDirectory(cfg.remoteDir, { recursive: true }) } catch { /* ignore */ }
   }
+  console.log('[sync] remoteFiles final:', JSON.stringify(remoteFiles))
 
   const localProjects = await repo.listProjects(true)
+  console.log('[sync] localProjects count:', localProjects.length)
   const remoteByPath = new Map(remoteFiles.map(f => [f.filename, f.etag]))
+  console.log('[sync] remoteByPath keys:', [...remoteByPath.keys()])
+  console.log('[sync] remoteByPath entries:', [...remoteByPath.entries()])
 
   let changed = false
   const refreshedProjects: Project[] = []
@@ -59,6 +76,7 @@ export async function runFullSync(
   for (const p of localProjects) {
     const filename = p.remotePath.split('/').pop()!
     const remoteEtag = remoteByPath.get(filename) ?? null
+    console.log('[sync] check local project', p.name, 'filename:', filename, 'remoteEtag:', remoteEtag)
 
     if (remoteEtag === null) {
       // 本地有 / 远端无 → 上传
@@ -116,8 +134,13 @@ export async function runFullSync(
   // 远端有 / 本地无 → 下载
   for (const [filename] of remoteByPath) {
     const path = `${cfg.remoteDir}/${filename}`
+    console.log('[sync] download remote project, filename:', filename, 'path:', path)
     const file = await fetchRemoteFile(client, path, null)
-    if (!file) continue
+    if (!file) {
+      console.warn('[sync] fetchRemoteFile returned null for path:', path)
+      continue
+    }
+    console.log('[sync] download success, project id:', file.project?.id, 'name:', file.project?.name)
     const projectId = filename.replace(/\.json$/, '')
     const existing = await repo.getProject(projectId)
     if (existing) {
@@ -151,15 +174,18 @@ export async function runFullSync(
 export async function syncOneProject(projectId: string): Promise<void> {
   const { getRepo } = await import('@/db')
   const repo = await getRepo()
-  const cfg = await getSyncConfig(repo)
+  const cfg = getSyncConfig()
   if (!cfg) return
   const p = await repo.getProject(projectId)
   if (!p) return
   const client = getClient(cfg)
   const localCheckins = await repo.getCheckins(p.id)
+  console.log('[sync] syncOneProject', p.name, 'remotePath:', p.remotePath, 'localEtag:', p.remoteEtag)
 
   const remoteEtag = await getDirEntryEtag(client, p.remotePath)
+  console.log('[sync] syncOneProject remoteEtag:', remoteEtag)
   if (remoteEtag && remoteEtag === p.remoteEtag) {
+    console.log('[sync] syncOneProject etag match, skip')
     return
   }
 
@@ -171,7 +197,10 @@ export async function syncOneProject(projectId: string): Promise<void> {
       })
       const newEtag = await getDirEntryEtag(client, p.remotePath) ?? String(res)
       await repo.upsertProject({ ...p, remoteEtag: newEtag })
-    } catch { /* 412 等留待下次 */ }
+    } catch (e) {
+      console.warn('[sync] syncOneProject upload failed:', e)
+      /* 留待 runFullSync 重试 */
+    }
     return
   }
 
@@ -192,18 +221,29 @@ export async function syncOneProject(projectId: string): Promise<void> {
       })
       const newEtag = await getDirEntryEtag(client, p.remotePath) ?? String(res)
       await repo.upsertProject({ ...p, ...project, remoteEtag: newEtag })
-    } catch { /* 412 等 */ }
+    } catch (e) {
+      console.warn('[sync] syncOneProject merge upload failed:', e)
+      /* 412 等 — 留待 runFullSync 重试 */
+    }
   }
 }
 
 async function getDirEntryEtag(client: ReturnType<typeof getClient>, path: string): Promise<string | null> {
   try {
     const dir = path.split('/').slice(0, -1).join('/') || '/'
-    const list = await client.getDirectoryContents(dir) as { data?: { filename?: string; etag?: string | null; type?: string }[] }
     const name = path.split('/').pop()!
-    const entry = (list?.data ?? []).find(f => f.filename === name)
+    const list = await client.getDirectoryContents(dir)
+    const items = Array.isArray(list) ? list : ((list as any)?.data ?? [])
+    console.log('[sync] getDirEntryEtag dir:', dir, 'name:', name, 'items count:', items.length)
+    const entry = items.find((f: any) => f.basename === name)
+    if (!entry) {
+      console.log('[sync] getDirEntryEtag NO MATCH for name:', name, 'available basenames:', items.map((f: any) => f.basename))
+    } else {
+      console.log('[sync] getDirEntryEtag match:', entry.basename, 'etag:', entry.etag)
+    }
     return entry?.etag ?? null
-  } catch {
+  } catch (e) {
+    console.warn('[sync] getDirEntryEtag error:', e)
     return null
   }
 }
@@ -212,9 +252,12 @@ async function fetchRemoteFile(client: ReturnType<typeof getClient>, path: strin
   try {
     const headers: Record<string, string> = {}
     if (ifNoneMatch) headers['If-None-Match'] = ifNoneMatch
+    console.log('[sync] fetchRemoteFile path:', path, 'ifNoneMatch:', ifNoneMatch)
     const data = await client.getFileContents(path, { format: 'text' })
+    console.log('[sync] fetchRemoteFile success, data type:', typeof data, 'length:', String(data).length)
     return JSON.parse(data as string) as ProjectFile
   } catch (e: any) {
+    console.warn('[sync] fetchRemoteFile error:', e?.status, e?.message || e)
     if (e?.status === 304) return null
     return null
   }
@@ -231,6 +274,38 @@ async function buildFile(p: Project, checkins: Checkin[]): Promise<ProjectFile> 
 function stripProject(p: Project): Omit<Project, 'remoteEtag'> {
   const { remoteEtag: _, ...rest } = p
   return rest
+}
+
+export async function cleanupDeletedProjects(): Promise<{ cleaned: number } | null> {
+  const cfg = getSyncConfig()
+  if (!cfg) return null
+  const client = getClient(cfg)
+  const { getRepo } = await import('@/db')
+  const repo = await getRepo()
+
+  const projects = await repo.listProjects(true)
+  const now = Date.now()
+  const NINETY_DAYS = 90 * 24 * 60 * 60 * 1000
+  let cleaned = 0
+
+  for (const p of projects) {
+    if (p.deleted !== 1) continue
+    if (now - p.updatedAt < NINETY_DAYS) continue
+
+    const file = await buildFile(p, [])
+    try {
+      const res = await client.putFileContents(p.remotePath, JSON.stringify(file, null, 2), {
+        contentLength: false,
+      })
+      const newEtag = await getDirEntryEtag(client, p.remotePath) ?? String(res)
+      await repo.upsertProject({ ...p, remoteEtag: newEtag })
+      cleaned++
+    } catch (e) {
+      console.warn('[sync] cleanupDeletedProjects failed for', p.name, e)
+    }
+  }
+
+  return { cleaned }
 }
 
 export { makeRemotePath }

@@ -1,10 +1,11 @@
 import type { Repo, DateRange } from './Repo'
 import type { Project, Checkin } from '../types'
-import { Kysely, sql } from 'kysely'
+import { Kysely } from 'kysely'
 
 export interface ProjectsTable {
   id: string
   name: string
+  description: string
   unit: string | null
   emoji: string
   color: string
@@ -14,6 +15,7 @@ export interface ProjectsTable {
   remote_etag: string | null
   remote_path: string
   deleted: number
+  archived: number
 }
 
 export interface CheckinsTable {
@@ -42,6 +44,14 @@ export abstract class SqliteKyselyRepo implements Repo {
 
   abstract init(): Promise<void>
 
+  async clearDatabase(): Promise<void> {
+    const db = await this.getDb()
+    await db.schema.dropTable('settings_kv').ifExists().execute()
+    await db.schema.dropTable('checkins').ifExists().execute()
+    await db.schema.dropTable('projects').ifExists().execute()
+    await this.createTables()
+  }
+
   protected async getDb(): Promise<Kysely<DB>> {
     if (!this.db) throw new Error('Repo not initialized. Call init() first.')
     return this.db
@@ -49,44 +59,69 @@ export abstract class SqliteKyselyRepo implements Repo {
 
   protected async createTables(): Promise<void> {
     const db = await this.getDb()
-    await sql`CREATE TABLE IF NOT EXISTS projects (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      unit TEXT,
-      emoji TEXT NOT NULL,
-      color TEXT NOT NULL,
-      sort REAL NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      remote_etag TEXT,
-      remote_path TEXT NOT NULL,
-      deleted INTEGER NOT NULL DEFAULT 0
-    )`.execute(db)
+    await db.schema
+      .createTable('projects')
+      .addColumn('id', 'text', col => col.primaryKey())
+      .addColumn('name', 'text', col => col.notNull())
+      .addColumn('description', 'text', col => col.notNull().defaultTo(''))
+      .addColumn('unit', 'text')
+      .addColumn('emoji', 'text', col => col.notNull())
+      .addColumn('color', 'text', col => col.notNull())
+      .addColumn('sort', 'real', col => col.notNull().defaultTo(0))
+      .addColumn('created_at', 'integer', col => col.notNull())
+      .addColumn('updated_at', 'integer', col => col.notNull())
+      .addColumn('remote_etag', 'text')
+      .addColumn('remote_path', 'text', col => col.notNull())
+      .addColumn('deleted', 'integer', col => col.notNull().defaultTo(0))
+      .ifNotExists()
+      .execute()
 
     try {
-      await sql`ALTER TABLE projects ADD COLUMN sort REAL NOT NULL DEFAULT 0`.execute(db)
+      await db.schema
+        .alterTable('projects')
+        .addColumn('sort', 'real', col => col.notNull().defaultTo(0))
+        .execute()
     } catch { /* column already exists */ }
 
-    await sql`CREATE TABLE IF NOT EXISTS checkins (
-      project_id TEXT NOT NULL,
-      date TEXT NOT NULL,
-      status TEXT NOT NULL,
-      value REAL,
-      note TEXT,
-      updated_at INTEGER NOT NULL,
-      PRIMARY KEY (project_id, date)
-    )`.execute(db)
+    try {
+      await db.schema
+        .alterTable('projects')
+        .addColumn('description', 'text', col => col.notNull().defaultTo(''))
+        .execute()
+    } catch { /* column already exists */ }
 
-    await sql`CREATE TABLE IF NOT EXISTS settings_kv (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    )`.execute(db)
+    try {
+      await db.schema
+        .alterTable('projects')
+        .addColumn('archived', 'integer', col => col.notNull().defaultTo(0))
+        .execute()
+    } catch { /* column already exists */ }
+
+    await db.schema
+      .createTable('checkins')
+      .addColumn('project_id', 'text', col => col.notNull())
+      .addColumn('date', 'text', col => col.notNull())
+      .addColumn('status', 'text', col => col.notNull())
+      .addColumn('value', 'real')
+      .addColumn('note', 'text')
+      .addColumn('updated_at', 'integer', col => col.notNull())
+      .addPrimaryKeyConstraint('checkins_pk', ['project_id', 'date'])
+      .ifNotExists()
+      .execute()
+
+    await db.schema
+      .createTable('settings_kv')
+      .addColumn('key', 'text', col => col.primaryKey())
+      .addColumn('value', 'text', col => col.notNull())
+      .ifNotExists()
+      .execute()
   }
 
   protected rowToProject(r: ProjectsTable): Project {
     return {
       id: r.id,
       name: r.name,
+      description: r.description ?? '',
       unit: r.unit,
       emoji: r.emoji,
       color: r.color,
@@ -96,6 +131,7 @@ export abstract class SqliteKyselyRepo implements Repo {
       remoteEtag: r.remote_etag,
       remotePath: r.remote_path,
       deleted: r.deleted as 0 | 1,
+      archived: r.archived as 0 | 1,
     }
   }
 
@@ -126,15 +162,45 @@ export abstract class SqliteKyselyRepo implements Repo {
 
   async upsertProject(p: Project): Promise<void> {
     const db = await this.getDb()
-    await sql`INSERT OR REPLACE INTO projects
-      (id, name, unit, emoji, color, sort, created_at, updated_at, remote_etag, remote_path, deleted)
-      VALUES (${p.id}, ${p.name}, ${p.unit}, ${p.emoji}, ${p.color}, ${p.sort}, ${p.createdAt}, ${p.updatedAt}, ${p.remoteEtag}, ${p.remotePath}, ${p.deleted})
-    `.execute(db)
+    await db.insertInto('projects')
+      .values({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        unit: p.unit,
+        emoji: p.emoji,
+        color: p.color,
+        sort: p.sort,
+        created_at: p.createdAt,
+        updated_at: p.updatedAt,
+        remote_etag: p.remoteEtag,
+        remote_path: p.remotePath,
+        deleted: p.deleted,
+        archived: p.archived,
+      })
+      .onConflict(cb => cb.column('id').doUpdateSet({
+        name: p.name,
+        description: p.description,
+        unit: p.unit,
+        emoji: p.emoji,
+        color: p.color,
+        sort: p.sort,
+        created_at: p.createdAt,
+        updated_at: p.updatedAt,
+        remote_etag: p.remoteEtag,
+        remote_path: p.remotePath,
+        deleted: p.deleted,
+        archived: p.archived,
+      }))
+      .execute()
   }
 
   async softDeleteProject(id: string, updatedAt: number): Promise<void> {
     const db = await this.getDb()
-    await sql`UPDATE projects SET deleted = 1, updated_at = ${updatedAt} WHERE id = ${id}`.execute(db)
+    await db.updateTable('projects')
+      .set({ deleted: 1, updated_at: updatedAt })
+      .where('id', '=', id)
+      .execute()
   }
 
   async getCheckin(projectId: string, date: string): Promise<Checkin | undefined> {
@@ -157,15 +223,52 @@ export abstract class SqliteKyselyRepo implements Repo {
 
   async upsertCheckin(c: Checkin): Promise<void> {
     const db = await this.getDb()
-    await sql`INSERT OR REPLACE INTO checkins
-      (project_id, date, status, value, note, updated_at)
-      VALUES (${c.projectId}, ${c.date}, ${c.status}, ${c.value}, ${c.note}, ${c.updatedAt})
-    `.execute(db)
+    await db.insertInto('checkins')
+      .values({
+        project_id: c.projectId,
+        date: c.date,
+        status: c.status,
+        value: c.value,
+        note: c.note,
+        updated_at: c.updatedAt,
+      })
+      .onConflict(cb => cb.columns(['project_id', 'date']).doUpdateSet({
+        status: c.status,
+        value: c.value,
+        note: c.note,
+        updated_at: c.updatedAt,
+      }))
+      .execute()
+  }
+
+  async bulkUpsertCheckins(checkins: Checkin[]): Promise<void> {
+    const db = await this.getDb()
+    for (const c of checkins) {
+      await db.insertInto('checkins')
+        .values({
+          project_id: c.projectId,
+          date: c.date,
+          status: c.status,
+          value: c.value,
+          note: c.note,
+          updated_at: c.updatedAt,
+        })
+        .onConflict(cb => cb.columns(['project_id', 'date']).doUpdateSet({
+          status: c.status,
+          value: c.value,
+          note: c.note,
+          updated_at: c.updatedAt,
+        }))
+        .execute()
+    }
   }
 
   async deleteCheckin(projectId: string, date: string): Promise<void> {
     const db = await this.getDb()
-    await sql`DELETE FROM checkins WHERE project_id = ${projectId} AND date = ${date}`.execute(db)
+    await db.deleteFrom('checkins')
+      .where('project_id', '=', projectId)
+      .where('date', '=', date)
+      .execute()
   }
 
   async getKV<T = unknown>(key: string): Promise<T | null> {
@@ -177,11 +280,17 @@ export abstract class SqliteKyselyRepo implements Repo {
 
   async setKV(key: string, value: unknown): Promise<void> {
     const db = await this.getDb()
-    await sql`INSERT OR REPLACE INTO settings_kv (key, value) VALUES (${key}, ${JSON.stringify(value)})`.execute(db)
+    const serialized = JSON.stringify(value)
+    await db.insertInto('settings_kv')
+      .values({ key, value: serialized })
+      .onConflict(cb => cb.column('key').doUpdateSet({ value: serialized }))
+      .execute()
   }
 
   async deleteKV(key: string): Promise<void> {
     const db = await this.getDb()
-    await sql`DELETE FROM settings_kv WHERE key = ${key}`.execute(db)
+    await db.deleteFrom('settings_kv')
+      .where('key', '=', key)
+      .execute()
   }
 }

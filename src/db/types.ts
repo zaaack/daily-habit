@@ -3,6 +3,7 @@ export type CheckStatus = 'success' | 'fail'
 export interface Project {
   id: string
   name: string
+  description: string
   unit: string | null
   emoji: string
   color: string
@@ -12,6 +13,7 @@ export interface Project {
   remoteEtag: string | null
   remotePath: string
   deleted: 0 | 1
+  archived: 0 | 1
 }
 
 export interface Checkin {

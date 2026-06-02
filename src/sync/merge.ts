@@ -45,17 +45,19 @@ export function mergeProjectFile(
     projectChanged = true
   } else if (remote.project.updatedAt === local.updatedAt) {
     const sameMeta = remote.project.name === local.name
+      && remote.project.description === local.description
       && remote.project.unit === local.unit
       && remote.project.emoji === local.emoji
       && remote.project.color === local.color
       && remote.project.deleted === local.deleted
+      && remote.project.archived === local.archived
     if (!sameMeta) {
       // 视为冲突；用项目维度冲突标记
       conflicts.push({
         date: '__project__',
         field: 'note',
-        local: JSON.stringify({ name: local.name, unit: local.unit, emoji: local.emoji, color: local.color, deleted: !!local.deleted }),
-        remote: JSON.stringify({ name: remote.project.name, unit: remote.project.unit, emoji: remote.project.emoji, color: remote.project.color, deleted: !!remote.project.deleted }),
+        local: JSON.stringify({ name: local.name, description: local.description, unit: local.unit, emoji: local.emoji, color: local.color, deleted: !!local.deleted, archived: !!local.archived }),
+        remote: JSON.stringify({ name: remote.project.name, description: remote.project.description, unit: remote.project.unit, emoji: remote.project.emoji, color: remote.project.color, deleted: !!remote.project.deleted, archived: !!remote.project.archived }),
       })
     }
   }

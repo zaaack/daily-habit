@@ -22,7 +22,17 @@
   "home": {
     "empty": "No projects yet",
     "emptyHint": "Tap + at the bottom to create one",
-    "newProject": "New project"
+    "newProject": "New project",
+    "failRate": "{{rate}}%",
+    "showDeleted": "Show deleted",
+    "hideDeleted": "Hide deleted",
+    "deletedProjects": "Deleted projects",
+    "restore": "Restore",
+    "filter": "Filter",
+    "filterTitle": "Show projects",
+    "statusNormal": "Normal",
+    "statusArchived": "Archived",
+    "statusDeleted": "Deleted"
   },
   "project": {
     "notFound": "Project not found",
@@ -72,8 +82,16 @@
     "importMhabit": "Import mhabit",
     "clear": "Clear",
     "invalidFormat": "Invalid file format",
+    "importing": "Importing {{current}}/{{total}} …",
+    "importSuccess": "Import successful",
     "importFailed": "Import failed: {{msg}}",
-    "clearConfirm": "Clear all local data? This action cannot be undone."
+    "syncFailed": "Sync failed: {{msg}}",
+    "clearConfirm": "Clear all local data? This action cannot be undone.",
+    "noSyncConfig": "WebDAV sync not configured",
+    "cleanDeleted": "Clean up deleted projects",
+    "cleanDeletedConfirm": "Clear WebDAV content for projects deleted over 90 days ago?",
+    "cleanDeletedDone": "Cleaned up {{count}} deleted projects",
+    "cleanDeletedFailed": "Cleanup failed: {{msg}}"
   },
   "notFound": {
     "title": "Page not found",
@@ -84,14 +102,19 @@
     "newProject": "New project",
     "name": "Name",
     "namePlaceholder": "e.g. Reading",
+    "description": "Description (optional)",
+    "descriptionPlaceholder": "Notes, goals, etc.",
     "unit": "Unit (optional)",
     "unitPlaceholder": "pages / km / min",
     "icon": "Icon",
     "color": "Color",
     "delete": "Delete",
+    "deleteConfirm": "Delete \"{{name}}\"? This cannot be undone.",
     "cancel": "Cancel",
     "save": "Save",
-    "create": "Create"
+    "create": "Create",
+    "archive": "Archive",
+    "unarchive": "Unarchive"
   },
   "checkin": {
     "edit": "Edit · {{date}}",
@@ -120,6 +143,7 @@
   },
   "chart": {
     "successCount": "Success Count",
+    "failCount": "Fail Count",
     "totalValue": "Total Value",
     "totalValueWithUnit": "Total Value ({{unit}})",
     "monthlyAvg": "Monthly Avg"

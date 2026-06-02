@@ -1,17 +1,47 @@
-import { useState, useEffect, useRef } from 'react'
-import { Plus, Check } from 'lucide-react'
+import { useState, useRef, useMemo } from 'react'
+import { Plus, Check, Filter } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { useAppStore } from '@/state/useAppStore'
 import { ProjectCard } from '@/components/ProjectCard'
 import { ProjectEditor } from '@/components/ProjectEditor'
+import { Modal } from '@/components/Modal'
 import { shiftDateStr, todayStr } from '@/db/schema'
 import { cn } from '@/lib/cn'
+import type { Project } from '@/db/types'
+
+function SortableProjectCard({ project, dates }: { project: Project; dates: string[] }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: project.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <ProjectCard project={project} dates={dates} sorting />
+    </div>
+  )
+}
 
 export function Home() {
   const { t } = useTranslation()
-  const projects = useAppStore(s => s.projects)
+  const allProjects = useAppStore(s => s.projects)
   const reorderProjects = useAppStore(s => s.reorderProjects)
+  const filter = useAppStore(s => s.filterState)
+  const setFilterState = useAppStore(s => s.setFilterState)
   const [open, setOpen] = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
+
+  const projects = useMemo(() => allProjects.filter(p => {
+    if (p.deleted) return filter.deleted
+    if (p.archived) return filter.archived
+    return filter.normal
+  }), [allProjects, filter])
 
   const today = todayStr()
   const todayDow = new Date(today + 'T00:00:00').getDay()
@@ -26,11 +56,12 @@ export function Home() {
   const [sorting, setSorting] = useState(false)
   const [localProjects, setLocalProjects] = useState(projects)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const dragState = useRef<{ idx: number; startY: number } | null>(null)
 
-  useEffect(() => {
-    if (!sorting) setLocalProjects(projects)
-  }, [projects, sorting])
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+  )
 
   const displayProjects = sorting ? localProjects : projects
 
@@ -40,53 +71,29 @@ export function Home() {
     navigator.vibrate?.(10)
   }
 
-  const handlePointerDown = (idx: number) => (e: React.PointerEvent) => {
-    if (!sorting) {
-      longPressTimer.current = setTimeout(startSortMode, 600)
-      return
-    }
-    e.preventDefault()
-    dragState.current = { idx, startY: e.clientY }
-
-    const onMove = (me: PointerEvent) => {
-      if (!dragState.current) return
-      me.preventDefault()
-      const delta = me.clientY - dragState.current.startY
-      if (Math.abs(delta) < 30) return
-      const dir = delta > 0 ? 1 : -1
-      const newIdx = Math.max(0, Math.min(localProjects.length - 1, dragState.current.idx + dir))
-      if (newIdx !== dragState.current.idx) {
-        setLocalProjects(prev => {
-          const next = [...prev]
-          const [item] = next.splice(dragState.current!.idx, 1)
-          next.splice(newIdx, 0, item)
-          return next
-        })
-        dragState.current.idx = newIdx
-        dragState.current.startY = me.clientY
-      }
-    }
-
-    const onUp = () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', onUp)
-      dragState.current = null
-    }
-
-    window.addEventListener('pointermove', onMove, { passive: false })
-    window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', onUp)
+  const handlePointerDown = () => {
+    longPressTimer.current = setTimeout(startSortMode, 600)
   }
 
   const handlePointerUp = () => {
     clearTimeout(longPressTimer.current)
   }
 
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (active.id !== over?.id) {
+      setLocalProjects(prev => {
+        const oldIndex = prev.findIndex(p => p.id === active.id)
+        const newIndex = prev.findIndex(p => p.id === over!.id)
+        if (oldIndex === -1 || newIndex === -1) return prev
+        return arrayMove(prev, oldIndex, newIndex)
+      })
+    }
+  }
+
   const doneSorting = () => {
     setSorting(false)
     reorderProjects(localProjects.map(p => p.id))
-    dragState.current = null
   }
 
   return (
@@ -94,6 +101,14 @@ export function Home() {
       <div className="card">
         <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
           <span className="tabular-nums">{rangeLabel}</span>
+          <button
+            onClick={() => setFilterOpen(true)}
+            className="ml-auto flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200"
+            aria-label={t('home.filter')}
+          >
+            <Filter size={14} />
+            {t('home.filter')}
+          </button>
           {sorting && (
             <button
               onClick={doneSorting}
@@ -132,16 +147,25 @@ export function Home() {
         </div>
       ) : (
         <div className="space-y-3">
-          {displayProjects.map((p, i) => (
-            <div
-              key={p.id}
-              onPointerDown={handlePointerDown(i)}
-              onPointerUp={handlePointerUp}
-              className={cn(sorting && 'touch-none select-none')}
-            >
-              <ProjectCard project={p} dates={dates} sorting={sorting} />
-            </div>
-          ))}
+          {sorting ? (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={displayProjects.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                {displayProjects.map(p => (
+                  <SortableProjectCard key={p.id} project={p} dates={dates} />
+                ))}
+              </SortableContext>
+            </DndContext>
+          ) : (
+            displayProjects.map(p => (
+              <div
+                key={p.id}
+                onPointerDown={handlePointerDown}
+                onPointerUp={handlePointerUp}
+              >
+                <ProjectCard project={p} dates={dates} />
+              </div>
+            ))
+          )}
         </div>
       )}
 
@@ -153,6 +177,25 @@ export function Home() {
         <Plus size={20} />
       </button>
       <ProjectEditor open={open} onOpenChange={setOpen} />
+
+      <Modal open={filterOpen} onOpenChange={setFilterOpen} title={t('home.filterTitle')} size="sm">
+        <div className="space-y-3">
+          {(['normal', 'archived', 'deleted'] as const).map(key => (
+            <label key={key} className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={filter[key]}
+                onChange={() => setFilterState({ ...filter, [key]: !filter[key] })}
+                className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-brand-500 focus:ring-brand-500"
+              />
+              <span className={cn(
+                'text-sm',
+                key === 'deleted' ? 'text-rose-400' : key === 'archived' ? 'text-amber-400/90' : 'text-slate-200',
+              )}>{t(`home.status${key.charAt(0).toUpperCase() + key.slice(1)}`)}</span>
+            </label>
+          ))}
+        </div>
+      </Modal>
     </div>
   )
 }

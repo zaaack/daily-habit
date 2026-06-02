@@ -14,6 +14,14 @@ class HabitDB extends Dexie {
       projects: 'id, updatedAt, deleted',
       checkins: '[projectId+date], projectId, date, updatedAt',
       kv: 'key',
+    }).upgrade(async (tx) => {
+      // Ensure all projects have archived field (added in v3)
+      const all = await tx.table('projects').toArray() as Project[]
+      for (const p of all) {
+        if (p.archived === undefined) {
+          await tx.table('projects').put({ ...p, archived: 0 })
+        }
+      }
     })
   }
 }
@@ -26,6 +34,13 @@ export class DexieRepo implements Repo {
   }
 
   async init(): Promise<void> {
+    await this.db.open()
+  }
+
+  async clearDatabase(): Promise<void> {
+    this.db.close()
+    await Dexie.delete('daily-habit')
+    this.db = new HabitDB()
     await this.db.open()
   }
 
@@ -67,6 +82,10 @@ export class DexieRepo implements Repo {
 
   async upsertCheckin(c: Checkin): Promise<void> {
     await this.db.checkins.put(c)
+  }
+
+  async bulkUpsertCheckins(checkins: Checkin[]): Promise<void> {
+    await this.db.checkins.bulkPut(checkins)
   }
 
   async deleteCheckin(projectId: string, date: string): Promise<void> {

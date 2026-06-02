@@ -40,17 +40,19 @@ export function MonthlyStatsChart({ checkins, color, currentYear, currentMonth, 
 
   const isCurrentPage = pageOffset === 0
 
-  const { labels, successValues, valueSumValues } = useMemo(() => {
-    const byMonth = new Map<string, { successCount: number; valueSum: number }>()
+  const { labels, successValues, failValues, valueSumValues } = useMemo(() => {
+    const byMonth = new Map<string, { successCount: number; failCount: number; valueSum: number }>()
     for (const c of checkins) {
       const key = c.date.slice(0, 7)
       const prev = byMonth.get(key)
       if (prev) {
         if (c.status === 'success') prev.successCount++
+        else if (c.status === 'fail') prev.failCount++
         if (c.value != null) prev.valueSum += c.value
       } else {
         byMonth.set(key, {
           successCount: c.status === 'success' ? 1 : 0,
+          failCount: c.status === 'fail' ? 1 : 0,
           valueSum: c.value ?? 0,
         })
       }
@@ -58,6 +60,7 @@ export function MonthlyStatsChart({ checkins, color, currentYear, currentMonth, 
 
     const labels: string[] = []
     const successValues: (number | null)[] = []
+    const failValues: (number | null)[] = []
     const valueSumValues: (number | null)[] = []
     for (const m of months) {
       const key = `${m.year}-${String(m.month + 1).padStart(2, '0')}`
@@ -65,13 +68,15 @@ export function MonthlyStatsChart({ checkins, color, currentYear, currentMonth, 
       const entry = byMonth.get(key)
       if (entry) {
         successValues.push(entry.successCount)
+        failValues.push(entry.failCount)
         valueSumValues.push(entry.valueSum)
       } else {
         successValues.push(null)
+        failValues.push(null)
         valueSumValues.push(null)
       }
     }
-    return { labels, successValues, valueSumValues }
+    return { labels, successValues, failValues, valueSumValues }
   }, [checkins, months])
 
   const label = `${months[0].year}.${months[0].month + 1} – ${months[11].year}.${months[11].month + 1}`
@@ -80,6 +85,7 @@ export function MonthlyStatsChart({ checkins, color, currentYear, currentMonth, 
   const axisColor = `rgb(${s.getPropertyValue('--c-slate-400').trim()})`
   const gridColor = `rgb(${s.getPropertyValue('--c-slate-600').trim()})`
   const successColor = '#22c55e'
+  const failColor = '#ef4444'
 
   const chartData = {
     labels,
@@ -92,6 +98,19 @@ export function MonthlyStatsChart({ checkins, color, currentYear, currentMonth, 
         borderWidth: 2,
         pointBackgroundColor: successColor,
         pointBorderColor: successColor,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        spanGaps: true,
+        yAxisID: 'y',
+      },
+      {
+        label: t('chart.failCount'),
+        data: failValues,
+        borderColor: failColor,
+        backgroundColor: failColor,
+        borderWidth: 2,
+        pointBackgroundColor: failColor,
+        pointBorderColor: failColor,
         pointRadius: 4,
         pointHoverRadius: 6,
         spanGaps: true,
