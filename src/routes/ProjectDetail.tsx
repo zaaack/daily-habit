@@ -178,6 +178,7 @@ export function ProjectDetail() {
                     unit={project.unit}
                     color={project.color}
                     refreshKey={tick}
+                    disabled={d > today}
                     onCycle={() => void cycle(project.id, d)}
                   />
                 </div>
