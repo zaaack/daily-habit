@@ -15,10 +15,10 @@ export function Home() {
 
   const today = todayStr()
   const dates: string[] = []
-  for (let i = 0; i < DAYS_PER_PAGE; i++) dates.push(shiftDateStr(today, endOffset - i))
+  for (let i = DAYS_PER_PAGE - 1; i >= 0; i--) dates.push(shiftDateStr(today, endOffset - i))
 
-  const oldest = dates[dates.length - 1]
-  const newest = dates[0]
+  const oldest = dates[0]
+  const newest = dates[dates.length - 1]
   const rangeLabel = `${oldest.slice(5)} – ${newest.slice(5)}`
   const isCurrent = endOffset === 0
 
