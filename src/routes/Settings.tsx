@@ -4,7 +4,7 @@ import { useAppStore } from '@/state/useAppStore'
 import { getSyncConfig, setSyncConfig, testConnection, syncOneProject, makeRemotePath } from '@/sync/fullSync'
 import type { WebDavConfig } from '@/sync/webdav'
 import type { ProjectFile } from '@/sync/merge'
-import { DEFAULT_REMOTE_DIR } from '@/db/schema'
+import { DEFAULT_REMOTE_DIR, makeProjectId, PROJECT_COLORS } from '@/db/schema'
 import { getRepo } from '@/db'
 import { Download, Upload, Trash2, Sun, Moon, Monitor } from 'lucide-react'
 import { format } from 'date-fns'
@@ -82,7 +82,12 @@ export function Settings() {
   async function handleImport(file: File) {
     try {
       const text = await file.text()
-      const data = JSON.parse(text) as ProjectFile[]
+      const parsed = JSON.parse(text)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray(parsed.habits)) {
+        await importMhabit(parsed.habits)
+        return
+      }
+      const data = parsed as ProjectFile[]
       if (!Array.isArray(data)) {
         alert(t('settings.invalidFormat'))
         return
@@ -112,6 +117,57 @@ export function Settings() {
       await repo.softDeleteProject(p.id, Date.now())
     }
     useAppStore.setState({ projects: [] })
+  }
+
+  function epochDayToDateStr(epochDay: number): string {
+    const d = new Date(epochDay * 86400000)
+    const y = d.getUTCFullYear()
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+    const day = String(d.getUTCDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+
+  async function importMhabit(habits: unknown[]) {
+    const repo = await getRepo()
+    const now = Date.now()
+    for (const h of habits) {
+      const habit = h as Record<string, unknown>
+      const name = String(habit.name ?? '')
+      if (!name) continue
+      const id = makeProjectId()
+      const colorIdx = Math.min(Math.max(((habit.color as number) ?? 1) - 1, 0), PROJECT_COLORS.length - 1)
+      await repo.upsertProject({
+        id,
+        name,
+        unit: (habit.daily_goal_unit as string) || null,
+        emoji: '📌',
+        color: PROJECT_COLORS[colorIdx],
+        createdAt: ((habit.create_t as number) ?? Math.floor(now / 1000)) * 1000,
+        updatedAt: ((habit.modify_t as number) ?? Math.floor(now / 1000)) * 1000,
+        remoteEtag: null,
+        remotePath: makeRemotePath(id, DEFAULT_REMOTE_DIR),
+        deleted: ((habit.status as number) ?? 1) === 1 ? 0 : 1,
+      })
+      const records = (habit.records as unknown[]) ?? []
+      for (const r of records) {
+        const rec = r as Record<string, unknown>
+        const recordDate = (rec.record_date as number) ?? 0
+        const reason = (rec.reason as string) ?? ''
+        const note = (rec.note as string) ?? ''
+        const combinedNote = reason && note ? `${reason} | ${note}` : (reason || note || null)
+        await repo.upsertCheckin({
+          projectId: id,
+          date: epochDayToDateStr(recordDate),
+          status: ((rec.record_type as number) ?? 1) === 1 ? 'success' : 'fail',
+          value: (rec.record_value as number | null) ?? null,
+          note: combinedNote,
+          updatedAt: ((rec.modify_t as number) ?? Math.floor(now / 1000)) * 1000,
+        })
+      }
+    }
+    const projects = await repo.listProjects()
+    useAppStore.setState({ projects })
+    for (const p of projects) void syncOneProject(p.id).catch(() => {})
   }
 
   return (
