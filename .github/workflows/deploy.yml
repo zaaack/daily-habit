@@ -40,6 +40,10 @@ jobs:
         with:
           path: docs
 
+      - name: Trigger Cloudflare Workers deploy hook
+        run: curl -fsS -X POST "${{ secrets.CF_BUILD_TOKEN }}"
+        continue-on-error: true
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
