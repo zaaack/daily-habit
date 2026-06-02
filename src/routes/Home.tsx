@@ -62,7 +62,7 @@ export function Home() {
               <div
                 key={'dow-' + d}
                 className={cn(
-                  'text-center',
+                  'text-left pl-1 box-border',
                   isToday ? 'font-bold text-black-950' : isFuture ? 'text-black-300' : 'text-black-400',
                 )}
               >
