@@ -1,31 +1,36 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight, GripVertical } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
+import { getRepo } from '@/db'
 import { StatusCell } from './StatusCell'
-import type { Project, Checkin } from '@/db/types'
-import { todayStr } from '@/db/schema'
+import type { Project, Checkin, CheckStatus } from '@/db/types'
+import { todayStr, nowMs } from '@/db/schema'
 import { cn } from '@/lib/cn'
 
 export function ProjectCard({ project, dates, sorting }: { project: Project; dates: string[]; sorting?: boolean }) {
   const { t } = useTranslation()
   const cycle = useAppStore(s => s.cycleCheckin)
+  const syncStatus = useAppStore(s => s.sync.status)
+  const syncAt = useAppStore(s => s.sync.at)
   const [checkins, setCheckins] = useState<Checkin[]>([])
-  const [tick, setTick] = useState(0)
+  const [refreshKey, setRefreshKey] = useState(0)
 
+  // Load checkins on mount, date range change, or sync completion
   useEffect(() => {
     let alive = true
     const load = async () => {
-      const { getRepo } = await import('@/db')
       const repo = await getRepo()
-      const all = await repo.getCheckins(project.id)
-      if (alive) setCheckins(all)
+      const start = dates[0]
+      const end = dates[dates.length - 1]
+      const range = start && end ? { from: start, to: end } : undefined
+      const data = await repo.getCheckins(project.id, range)
+      if (alive) setCheckins(data)
     }
     void load()
-    const t = setInterval(() => { void load(); setTick(x => x + 1) }, 2000)
-    return () => { alive = false; clearInterval(t) }
-  }, [project.id])
+    return () => { alive = false }
+  }, [project.id, dates[0], dates[dates.length - 1], syncStatus === 'ok' ? syncAt : null])
 
   const byDate = new Map(checkins.map(c => [c.date, c]))
   const today = todayStr()
@@ -39,6 +44,34 @@ export function ProjectCard({ project, dates, sorting }: { project: Project; dat
     }
     return total > 0 ? Math.round((fail / total) * 100) : null
   })()
+
+  const onCycle = useCallback(async (date: string) => {
+    const cur = byDate.get(date)
+    let nextStatus: CheckStatus | null
+    if (!cur) nextStatus = 'success'
+    else if (cur.status === 'success') nextStatus = 'fail'
+    else nextStatus = null
+
+    // Optimistic: update local state immediately
+    setCheckins(prev => {
+      if (nextStatus === null) {
+        return prev.filter(c => c.date !== date)
+      }
+      const exists = prev.find(c => c.date === date)
+      if (exists) {
+        return prev.map(c => c.date === date ? { ...c, status: nextStatus, updatedAt: nowMs() } : c)
+      }
+      const newCheckin: Checkin = {
+        projectId: project.id, date, status: nextStatus,
+        value: null, note: null, updatedAt: nowMs(),
+      }
+      return [...prev, newCheckin]
+    })
+    setRefreshKey(k => k + 1)
+
+    // Write to DB
+    await cycle(project.id, date)
+  }, [project.id, byDate, cycle])
 
   if (sorting) {
     return (
@@ -91,8 +124,8 @@ export function ProjectCard({ project, dates, sorting }: { project: Project; dat
                 color={project.color}
                 compact
                 disabled={isFuture}
-                refreshKey={tick}
-                onCycle={() => void cycle(project.id, d)}
+                refreshKey={refreshKey}
+                onCycle={() => void onCycle(d)}
               />
             </div>
           )

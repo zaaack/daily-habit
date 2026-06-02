@@ -78,7 +78,16 @@ export function mergeProjectFile(
       const same = lc.status === rc.status
         && (lc.value ?? null) === (rc.value ?? null)
         && (lc.note ?? null) === (rc.note ?? null)
-      merged.push(same ? lc : lc)
+      if (!same) {
+        const field: 'status' | 'value' | 'note' = lc.status !== rc.status ? 'status' : (lc.value !== rc.value ? 'value' : 'note')
+        conflicts.push({
+          date: rc.date,
+          field,
+          local: pickField(lc, field),
+          remote: pickField(rc, field),
+        })
+      }
+      merged.push(lc)
       continue
     }
     const winner = lc.updatedAt > rc.updatedAt ? lc : rc

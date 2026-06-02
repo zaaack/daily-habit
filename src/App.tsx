@@ -9,6 +9,7 @@ import { Settings } from '@/routes/Settings'
 import { NotFound } from '@/routes/NotFound'
 import { Layout } from '@/components/Layout'
 import { ConflictDialog } from '@/components/ConflictDialog'
+import { DebugPanel } from '@/components/DebugPanel'
 
 const router = createHashRouter([
   {
@@ -48,6 +49,16 @@ export function App() {
     if (bootedRef.current) return
     bootedRef.current = true
     void init()
+
+    // 每 5 分钟定期检查云端同步
+    const interval = setInterval(() => {
+      // 只在非 syncing 状态下触发，避免堆积
+      const s = useAppStore.getState().sync
+      if (s.status !== 'syncing') {
+        void useAppStore.getState().triggerSync()
+      }
+    }, 5 * 60 * 1000)
+    return () => clearInterval(interval)
   }, [init])
 
   useEffect(() => {
@@ -56,6 +67,30 @@ export function App() {
     mq.addEventListener('change', onChange)
     return () => mq.removeEventListener('change', onChange)
   }, [])
+
+  // F12: open DevTools in Tauri packaged builds
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'F12') {
+        e.preventDefault()
+        tryOpenDevTools()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  async function tryOpenDevTools() {
+    try {
+      const { getCurrentWebview } = await import('@tauri-apps/api/webview')
+      const wv = getCurrentWebview()
+      if ('openDevtools' in wv) {
+        await (wv as any).openDevtools()
+      }
+    } catch {
+      // not in Tauri or API unavailable
+    }
+  }
 
   if (!ready) {
     return (
@@ -69,6 +104,7 @@ export function App() {
     <>
       <RouterProvider router={router} />
       <ConflictDialog />
+      <DebugPanel />
     </>
   )
 }

@@ -7,6 +7,9 @@ import { makeRemotePath } from '@/db/schema'
 
 const SYNC_CONFIG_KEY = 'webdav.config'
 
+/** 防止并发 runFullSync */
+let _fullSyncInProgress = false
+
 export function getSyncConfig(): WebDavConfig | null {
   try {
     const raw = localStorage.getItem(SYNC_CONFIG_KEY)
@@ -44,8 +47,18 @@ export async function runFullSync(
 ): Promise<void> {
   const cfg = getSyncConfig()
   if (!cfg) return
-  const client = await getClient(cfg)
-  console.log('[sync] runFullSync start, remoteDir:', cfg.remoteDir)
+
+  if (_fullSyncInProgress) {
+    console.log('[sync] runFullSync skipped: already in progress')
+    return
+  }
+  _fullSyncInProgress = true
+  try {
+    const client = await getClient(cfg)
+    console.log('[sync] runFullSync start, remoteDir:', cfg.remoteDir)
+
+    // 读取上一次完整同步时间，据此判断本地是否有新变更
+    const lastSyncAt = await repo.getKV<number>('sync.lastAt')
 
   // 1. 列出远端
   let remoteFiles: { filename: string; etag: string | null }[] = []
@@ -56,7 +69,7 @@ export async function runFullSync(
     console.log('[sync] getDirectoryContents items:', JSON.stringify(items, null, 2).slice(0, 2000))
     remoteFiles = items
       .filter((f: any) => f.type !== 'directory' && f.filename?.endsWith('.json'))
-      .map((f: any) => ({ filename: f.basename!, etag: f.etag ?? null }))
+      .map((f: any) => ({ filename: f.basename!, etag: normalizeEtag(f.etag) ?? null }))
     console.log('[sync] remoteFiles (after filter):', JSON.stringify(remoteFiles))
   } catch (e) {
     console.warn('[sync] getDirectoryContents failed:', e)
@@ -87,7 +100,7 @@ export async function runFullSync(
           contentLength: false,
         })
         const newEtagStr = await getDirEntryEtag(client, p.remotePath)
-        const next: Project = { ...p, remoteEtag: newEtagStr ?? String(newEtag) }
+        const next: Project = { ...p, remoteEtag: newEtagStr ?? normalizeEtag(String(newEtag)) }
         await repo.upsertProject(next)
         refreshedProjects.push(next)
         changed = true
@@ -100,7 +113,25 @@ export async function runFullSync(
     }
 
     if (p.remoteEtag === remoteEtag) {
-      refreshedProjects.push(p)
+      // etag 匹配 → 检查本地是否有新变更，有则上传
+      if (lastSyncAt && p.updatedAt <= lastSyncAt) {
+        // 本地无新变更，无需上传
+        refreshedProjects.push(p)
+      } else {
+        const file = await buildFile(p, await repo.getCheckins(p.id))
+        try {
+          const newEtag = await client.putFileContents(p.remotePath, JSON.stringify(file, null, 2), {
+            contentLength: false,
+          })
+          const newEtagStr = await getDirEntryEtag(client, p.remotePath)
+          const next: Project = { ...p, remoteEtag: newEtagStr ?? normalizeEtag(String(newEtag)) }
+          await repo.upsertProject(next)
+          refreshedProjects.push(next)
+          changed = true
+        } catch (e) {
+          refreshedProjects.push(p)
+        }
+      }
       remoteByPath.delete(filename)
       continue
     }
@@ -170,6 +201,9 @@ export async function runFullSync(
     const list = await repo.listProjects()
     hooks.onProjectsChange(list)
   }
+  } finally {
+    _fullSyncInProgress = false
+  }
 }
 
 export async function syncOneProject(projectId: string): Promise<void> {
@@ -186,7 +220,18 @@ export async function syncOneProject(projectId: string): Promise<void> {
   const remoteEtag = await getDirEntryEtag(client, p.remotePath)
   console.log('[sync] syncOneProject remoteEtag:', remoteEtag)
   if (remoteEtag && remoteEtag === p.remoteEtag) {
-    console.log('[sync] syncOneProject etag match, skip')
+    // etag 匹配 → 本地数据可能已变更，直接上传
+    console.log('[sync] syncOneProject etag match, uploading local changes')
+    const file = await buildFile(p, localCheckins)
+    try {
+      const res = await client.putFileContents(p.remotePath, JSON.stringify(file, null, 2), {
+        contentLength: false,
+      })
+      const newEtag = await getDirEntryEtag(client, p.remotePath) ?? normalizeEtag(String(res))
+      await repo.upsertProject({ ...p, remoteEtag: newEtag })
+    } catch (e) {
+      console.warn('[sync] syncOneProject upload after etag match failed:', e)
+    }
     return
   }
 
@@ -196,7 +241,7 @@ export async function syncOneProject(projectId: string): Promise<void> {
       const res = await client.putFileContents(p.remotePath, JSON.stringify(file, null, 2), {
         contentLength: false,
       })
-      const newEtag = await getDirEntryEtag(client, p.remotePath) ?? String(res)
+      const newEtag = await getDirEntryEtag(client, p.remotePath) ?? normalizeEtag(String(res))
       await repo.upsertProject({ ...p, remoteEtag: newEtag })
     } catch (e) {
       console.warn('[sync] syncOneProject upload failed:', e)
@@ -205,8 +250,21 @@ export async function syncOneProject(projectId: string): Promise<void> {
     return
   }
 
-  const remote = await fetchRemoteFile(client, p.remotePath, p.remoteEtag)
-  if (!remote) return
+  const remote = await fetchRemoteFile(client, p.remotePath, null)
+  if (!remote) {
+    // 304/错误：无法获取远端内容，直接上传本地变更
+    const file = await buildFile(p, localCheckins)
+    try {
+      const res = await client.putFileContents(p.remotePath, JSON.stringify(file, null, 2), {
+        contentLength: false,
+      })
+      const newEtag = await getDirEntryEtag(client, p.remotePath) ?? normalizeEtag(String(res))
+      await repo.upsertProject({ ...p, remoteEtag: newEtag })
+    } catch (e) {
+      console.warn('[sync] syncOneProject fallback upload failed:', e)
+    }
+    return
+  }
   const { project, checkins, conflicts } = mergeProjectFile(stripProject(p), localCheckins, remote)
   if (conflicts.length) {
     const { useAppStore } = await import('@/state/useAppStore')
@@ -220,13 +278,19 @@ export async function syncOneProject(projectId: string): Promise<void> {
       const res = await client.putFileContents(p.remotePath, JSON.stringify(file, null, 2), {
         contentLength: false,
       })
-      const newEtag = await getDirEntryEtag(client, p.remotePath) ?? String(res)
+      const newEtag = await getDirEntryEtag(client, p.remotePath) ?? normalizeEtag(String(res))
       await repo.upsertProject({ ...p, ...project, remoteEtag: newEtag })
     } catch (e) {
       console.warn('[sync] syncOneProject merge upload failed:', e)
       /* 412 等 — 留待 runFullSync 重试 */
     }
   }
+}
+
+/** 统一 etag 格式：去掉外层引号和 weak 标记（如 W/"abc" → abc） */
+function normalizeEtag(etag: string | null): string | null {
+  if (!etag) return null
+  return etag.replace(/^(?:W\/)?"(.*)"$/, '$1').trim() || null
 }
 
 async function getDirEntryEtag(client: WebDAVClient, path: string): Promise<string | null> {
@@ -242,7 +306,7 @@ async function getDirEntryEtag(client: WebDAVClient, path: string): Promise<stri
     } else {
       console.log('[sync] getDirEntryEtag match:', entry.basename, 'etag:', entry.etag)
     }
-    return entry?.etag ?? null
+    return normalizeEtag(entry?.etag ?? null)
   } catch (e) {
     console.warn('[sync] getDirEntryEtag error:', e)
     return null
@@ -254,7 +318,7 @@ async function fetchRemoteFile(client: WebDAVClient, path: string, ifNoneMatch: 
     const headers: Record<string, string> = {}
     if (ifNoneMatch) headers['If-None-Match'] = ifNoneMatch
     console.log('[sync] fetchRemoteFile path:', path, 'ifNoneMatch:', ifNoneMatch)
-    const data = await client.getFileContents(path, { format: 'text' })
+    const data = await client.getFileContents(path, { format: 'text', headers })
     console.log('[sync] fetchRemoteFile success, data type:', typeof data, 'length:', String(data).length)
     return JSON.parse(data as string) as ProjectFile
   } catch (e: any) {
@@ -298,7 +362,7 @@ export async function cleanupDeletedProjects(): Promise<{ cleaned: number } | nu
       const res = await client.putFileContents(p.remotePath, JSON.stringify(file, null, 2), {
         contentLength: false,
       })
-      const newEtag = await getDirEntryEtag(client, p.remotePath) ?? String(res)
+      const newEtag = await getDirEntryEtag(client, p.remotePath) ?? normalizeEtag(String(res))
       await repo.upsertProject({ ...p, remoteEtag: newEtag })
       cleaned++
     } catch (e) {

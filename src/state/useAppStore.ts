@@ -40,6 +40,8 @@ interface AppState {
   setFilterState(state: FilterState): void
 }
 
+let _syncInterval: ReturnType<typeof setInterval> | null = null
+
 export const useAppStore = create<AppState>((set, get) => ({
   ready: false,
   projects: [],
@@ -48,22 +50,32 @@ export const useAppStore = create<AppState>((set, get) => ({
   filterState: { normal: true, archived: false, deleted: false },
 
   async init() {
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('初始化超时，请检查数据库连接')), 15000),
+    )
     try {
-      const repo = await getRepo()
-      const lastSyncAt = await repo.getKV<number>('sync.lastAt')
-      const lastSyncErr = await repo.getKV<string>('sync.lastError')
-      const projects = sortProjects(await repo.listProjects())
-      set({
-        projects,
-        sync: {
-          status: lastSyncErr ? 'error' : 'ok',
-          at: lastSyncAt ?? null,
-          error: lastSyncErr ?? null,
-          pending: 0,
-        },
-        ready: true,
-      })
-      void get().triggerSync()
+      const inner = (async () => {
+        const repo = await getRepo()
+        const lastSyncAt = await repo.getKV<number>('sync.lastAt')
+        const lastSyncErr = await repo.getKV<string>('sync.lastError')
+        const projects = sortProjects(await repo.listProjects())
+        set({
+          projects,
+          sync: {
+            status: lastSyncErr ? 'error' : 'ok',
+            at: lastSyncAt ?? null,
+            error: lastSyncErr ?? null,
+            pending: 0,
+          },
+          ready: true,
+        })
+        void get().triggerSync()
+
+        if (!_syncInterval) {
+          _syncInterval = setInterval(() => { void get().triggerSync() }, 5 * 60 * 1000)
+        }
+      })()
+      await Promise.race([inner, timeout])
     } catch (e) {
       set({
         sync: { status: 'error', at: null, error: e instanceof Error ? e.message : String(e), pending: 0 },
