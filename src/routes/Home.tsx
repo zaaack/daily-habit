@@ -53,7 +53,7 @@ export function Home() {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-7 gap-1 text-[9px] text-slate-500">
+        <div className="grid grid-cols-7 gap-1 text-[9px]">
           {dates.map(d => {
             const dow = new Date(d + 'T00:00:00').getDay()
             const isToday = d === today
@@ -63,8 +63,7 @@ export function Home() {
                 key={'dow-' + d}
                 className={cn(
                   'text-center',
-                  isToday && 'font-bold',
-                  isFuture && 'text-slate-700',
+                  isToday ? 'font-bold text-slate-950' : isFuture ? 'text-slate-500' : 'text-slate-400',
                 )}
               >
                 {'日一二三四五六'[dow]}

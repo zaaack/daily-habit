@@ -49,7 +49,7 @@ export function ProjectCard({ project, dates }: { project: Project; dates: strin
             <div
               key={d}
               className={cn(
-                isFuture && 'opacity-30',
+                isFuture && 'opacity-50',
               )}
             >
               <StatusCell
