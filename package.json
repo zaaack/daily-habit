@@ -12,7 +12,7 @@
     "icons": "node scripts/generate-icons.mjs",
     "cap:sync": "cap sync android",
     "cap:open:android": "cap open android",
-    "android:build": "pnpm build && cap sync android && cd android && ./gradlew assembleDebug"
+    "android:build": "VITE_BASE_URL=/ pnpm build && cap sync android && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "^6.0.2",
