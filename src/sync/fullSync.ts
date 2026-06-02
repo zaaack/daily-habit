@@ -144,7 +144,7 @@ export async function runFullSync(
       continue
     }
     const localCheckins = await repo.getCheckinsAll(p.id)
-    const { project, checkins: mergedCheckins, conflicts, changed: merged } = mergeProjectFile(
+    const { project, checkinsAll: mergedAll, checkins: mergedActive, conflicts, changed: merged } = mergeProjectFile(
       stripProject(p), localCheckins, file,
     )
 
@@ -155,15 +155,21 @@ export async function runFullSync(
     if (merged) {
       const nextProject: Omit<Project, 'remoteEtag'> = { ...project, remotePath: p.remotePath }
       await repo.upsertProject({ ...p, ...nextProject, remoteEtag })
-      const mergedDates = new Set(mergedCheckins.map(c => c.date))
+      for (const c of mergedAll) await repo.upsertCheckin(c)
+
+      // 补充本地-only 的 active checkin
+      const mergedDates = new Set(mergedAll.map(c => c.date))
       for (const c of localCheckins) {
-        if (!mergedDates.has(c.date) && c.status !== 'deleted') mergedCheckins.push(c)
+        if (!mergedDates.has(c.date) && c.status !== 'deleted') {
+          mergedActive.push(c)
+          mergedDates.add(c.date)
+        }
       }
-      for (const c of mergedCheckins) await repo.upsertCheckin(c)
+      for (const c of mergedActive) await repo.upsertCheckin(c)
 
       // 重新上传含 tombstone 的完整文件
       try {
-        const uploadCheckins = mergedCheckins.concat(localCheckins.filter(c => !mergedDates.has(c.date) && c.status === 'deleted'))
+        const uploadCheckins = mergedActive.concat(localCheckins.filter(c => !mergedDates.has(c.date) && c.status === 'deleted'))
         const uploadFile = await buildFile({ ...p, ...nextProject }, uploadCheckins)
         await client.putFileContents(p.remotePath, JSON.stringify(uploadFile, null, 2), { contentLength: false })
         const newEtag = await getDirEntryEtag(client, p.remotePath)
@@ -189,12 +195,12 @@ export async function runFullSync(
     const existing = await repo.getProject(projectId)
     if (existing) {
       const localCheckins = await repo.getCheckinsAll(projectId)
-      const { project, checkins, conflicts } = mergeProjectFile(
+      const { project, checkinsAll, conflicts } = mergeProjectFile(
         stripProject(existing), localCheckins, file,
       )
       if (conflicts.length) hooks.onConflict(projectId, conflicts)
       await repo.upsertProject({ ...existing, ...project, remotePath: path })
-      for (const c of checkins) await repo.upsertCheckin(c)
+      for (const c of checkinsAll) await repo.upsertCheckin(c)
     } else {
       const newProject: Project = {
         ...file.project,
@@ -277,20 +283,25 @@ export async function syncOneProject(projectId: string): Promise<void> {
     }
     return
   }
-  const { project, checkins: mergedCheckins, conflicts } = mergeProjectFile(stripProject(p), localCheckins, remote)
+  const { project, checkinsAll: mergedAll, checkins: mergedActive, conflicts } = mergeProjectFile(stripProject(p), localCheckins, remote)
   if (conflicts.length) {
     const { useAppStore } = await import('@/state/useAppStore')
     useAppStore.setState(s => ({ conflicts: { ...s.conflicts, [p.id]: conflicts } }))
   }
   if (conflicts.length === 0) {
     await repo.upsertProject({ ...p, ...project, remoteEtag })
-    const mergedDates = new Set(mergedCheckins.map(c => c.date))
+    for (const c of mergedAll) await repo.upsertCheckin(c)
+
+    const mergedDates = new Set(mergedAll.map(c => c.date))
     for (const c of localCheckins) {
-      if (!mergedDates.has(c.date) && c.status !== 'deleted') mergedCheckins.push(c)
+      if (!mergedDates.has(c.date) && c.status !== 'deleted') {
+        mergedActive.push(c)
+        mergedDates.add(c.date)
+      }
     }
-    for (const c of mergedCheckins) await repo.upsertCheckin(c)
+    for (const c of mergedActive) await repo.upsertCheckin(c)
     try {
-      const uploadCheckins = mergedCheckins.concat(localCheckins.filter(c => !mergedDates.has(c.date) && c.status === 'deleted'))
+      const uploadCheckins = mergedActive.concat(localCheckins.filter(c => !mergedDates.has(c.date) && c.status === 'deleted'))
       const file = await buildFile({ ...p, ...project }, uploadCheckins)
       const res = await client.putFileContents(p.remotePath, JSON.stringify(file, null, 2), {
         contentLength: false,

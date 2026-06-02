@@ -59,13 +59,16 @@ type ProjectMeta = Omit<Project, 'remoteEtag' | 'remotePath'>
 
 export interface MergeResult {
   project: ProjectMeta
+  /** 含 tombstone 的完整合并结果，应写入 DB */
+  checkinsAll: Checkin[]
+  /** 过滤掉 tombstone 的结果，用于 UI 和 re-upload */
   checkins: Checkin[]
   conflicts: ConflictItem[]
   changed: boolean
 }
 
 export function emptyMergeResult(project: ProjectMeta, checkins: Checkin[] = []): MergeResult {
-  return { project, checkins, conflicts: [], changed: false }
+  return { project, checkinsAll: checkins, checkins, conflicts: [], changed: false }
 }
 
 /**
@@ -143,10 +146,10 @@ export function mergeProjectFile(
   }
 
   merged.sort((a, b) => a.date.localeCompare(b.date))
-  const result = merged.filter(c => c.status !== 'deleted')
-  const changed = projectChanged || result.length !== localCheckins.length
-    || result.some((c, i) => c.updatedAt !== localCheckins[i]?.updatedAt)
-  return { project, checkins: result, conflicts, changed }
+  const active = merged.filter(c => c.status !== 'deleted')
+  const changed = projectChanged || merged.length !== localCheckins.length
+    || merged.some((c, i) => c.updatedAt !== localCheckins[i]?.updatedAt)
+  return { project, checkinsAll: merged, checkins: active, conflicts, changed }
 }
 
 function pickField(c: Checkin, f: 'status' | 'value' | 'note'): string | number | null {
