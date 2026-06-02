@@ -4,6 +4,7 @@ import { useAppStore } from '@/state/useAppStore'
 import { ProjectCard } from '@/components/ProjectCard'
 import { ProjectEditor } from '@/components/ProjectEditor'
 import { shiftDateStr, todayStr } from '@/db/schema'
+import { cn } from '@/lib/cn'
 
 const DAYS_PER_PAGE = 7
 
@@ -53,7 +54,20 @@ export function Home() {
         <div className="grid grid-cols-7 gap-1 text-[9px] text-slate-500">
           {dates.map(d => {
             const dow = new Date(d + 'T00:00:00').getDay()
-            return <div key={'dow-' + d} className="text-center">{'日一二三四五六'[dow]}</div>
+            const isToday = d === today
+            const isPast = d < today
+            return (
+              <div
+                key={'dow-' + d}
+                className={cn(
+                  'text-center',
+                  isToday && 'text-brand-500 font-bold',
+                  isPast && !isToday && 'text-slate-600',
+                )}
+              >
+                {'日一二三四五六'[dow]}
+              </div>
+            )
           })}
         </div>
       </div>

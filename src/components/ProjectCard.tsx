@@ -4,6 +4,8 @@ import { ChevronRight } from 'lucide-react'
 import { useAppStore } from '@/state/useAppStore'
 import { StatusCell } from './StatusCell'
 import type { Project, Checkin } from '@/db/types'
+import { todayStr } from '@/db/schema'
+import { cn } from '@/lib/cn'
 
 export function ProjectCard({ project, dates }: { project: Project; dates: string[] }) {
   const cycle = useAppStore(s => s.cycleCheckin)
@@ -24,6 +26,7 @@ export function ProjectCard({ project, dates }: { project: Project; dates: strin
   }, [project.id])
 
   const byDate = new Map(checkins.map(c => [c.date, c]))
+  const today = todayStr()
 
   return (
     <div className="card">
@@ -41,18 +44,28 @@ export function ProjectCard({ project, dates }: { project: Project; dates: strin
       <div className="grid grid-cols-7 gap-1">
         {dates.map(d => {
           const c = byDate.get(d)
+          const isToday = d === today
+          const isPast = d < today
           return (
-            <StatusCell
+            <div
               key={d}
-              projectId={project.id}
-              date={d}
-              checkin={c}
-              unit={project.unit}
-              color={project.color}
-              compact
-              refreshKey={tick}
-              onCycle={() => void cycle(project.id, d)}
-            />
+              className={cn(
+                'rounded-md',
+                isToday && 'ring-1 ring-brand-500/50',
+                !isPast && !isToday && 'opacity-50',
+              )}
+            >
+              <StatusCell
+                projectId={project.id}
+                date={d}
+                checkin={c}
+                unit={project.unit}
+                color={project.color}
+                compact
+                refreshKey={tick}
+                onCycle={() => void cycle(project.id, d)}
+              />
+            </div>
           )
         })}
       </div>
