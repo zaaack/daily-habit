@@ -36,7 +36,7 @@ export function CheckinEditor({ open, onOpenChange, projectId, date, initial, un
                 className={
                   'flex-1 btn ' +
                   (status === s
-                    ? (s === 'success' ? 'bg-brand-500 text-slate-950' : 'bg-rose-500 text-white')
+                    ? (s === 'success' ? 'bg-brand-500 text-white' : 'bg-rose-500 text-white')
                     : 'btn-outline')
                 }
               >{s === 'success' ? '✅ 完成' : '❌ 失败'}</button>

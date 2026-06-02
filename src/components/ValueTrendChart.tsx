@@ -57,6 +57,10 @@ export function ValueTrendChart({ checkins, color, currentYear, currentMonth }: 
       return
     }
 
+    const s = getComputedStyle(document.documentElement)
+    const axisColor = `rgb(${s.getPropertyValue('--c-slate-400').trim()})`
+    const gridColor = `rgb(${s.getPropertyValue('--c-slate-600').trim()})`
+
     const opts: UPlotOptions = {
       width: ref.current.clientWidth,
       height: 200,
@@ -74,14 +78,14 @@ export function ValueTrendChart({ checkins, color, currentYear, currentMonth }: 
       ],
       axes: [
         {
-          stroke: '#94a3b8',
-          grid: { stroke: '#1e293b' },
+          stroke: axisColor,
+          grid: { stroke: gridColor },
           values: (_self, ticks) => ticks.map(t => {
             const d = new Date(t * 1000)
             return `${d.getMonth() + 1}月`
           }),
         },
-        { stroke: '#94a3b8', grid: { stroke: '#1e293b' }, size: 50 },
+        { stroke: axisColor, grid: { stroke: gridColor }, size: 50 },
       ],
     }
     plotRef.current = new uPlot(opts, data, ref.current)

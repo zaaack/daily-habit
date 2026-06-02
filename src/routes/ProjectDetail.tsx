@@ -212,17 +212,17 @@ export function ProjectDetail() {
       <div className="card">
         <div className="relative mb-2">
           <button
-            className="flex items-center gap-1 text-sm font-semibold text-slate-800 hover:text-brand-500"
+            className="flex items-center gap-1 text-sm font-semibold text-slate-200 hover:text-brand-500"
             onClick={() => setPickerOpen(v => !v)}
           >
             {viewYear} 年 {viewMonth} 月
             <ChevronDown size={14} className={cn('transition-transform', pickerOpen && 'rotate-180')} />
           </button>
           {pickerOpen && (
-            <div className="absolute left-0 top-full mt-1 z-10 bg-white rounded-lg shadow-lg border border-slate-200 p-2 min-w-[200px]">
+            <div className="absolute left-0 top-full mt-1 z-10 bg-slate-900 rounded-lg shadow-lg border border-slate-700 p-2 min-w-[200px]">
               <div className="flex items-center gap-2 mb-2">
                 <select
-                  className="flex-1 text-sm border border-slate-200 rounded px-2 py-1"
+                  className="flex-1 text-sm bg-slate-800 border border-slate-600 rounded px-2 py-1 text-slate-100"
                   value={viewYear}
                   onChange={e => {
                     const y = Number(e.target.value)
@@ -242,7 +242,7 @@ export function ProjectDetail() {
                       'text-xs py-1.5 rounded',
                       m === viewMonth
                         ? 'bg-brand-500 text-white'
-                        : 'text-slate-600 hover:bg-slate-100'
+                        : 'text-slate-300 hover:bg-slate-800'
                     )}
                     onClick={() => navigateToMonth(viewYear, m)}
                   >
@@ -253,7 +253,7 @@ export function ProjectDetail() {
             </div>
           )}
         </div>
-        <div className="grid grid-cols-7 gap-1 text-[10px] text-slate-800 mb-1">
+        <div className="grid grid-cols-7 gap-1 text-[10px] text-slate-200 mb-1">
           {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="text-center">{d}</div>)}
         </div>
         <div

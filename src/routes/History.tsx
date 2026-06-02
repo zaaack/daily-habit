@@ -99,7 +99,7 @@ export function History() {
               >
                 <span className={cn(
                   'h-5 w-5 rounded grid place-items-center text-xs flex-shrink-0 mt-0.5',
-                  c.status === 'success' ? 'text-slate-950' : 'text-white',
+                  'text-white',
                 )}
                 style={c.status === 'success' ? { background: p?.color ?? '#22c55e' } : { background: '#ef4444' }}
                 >{c.status === 'success' ? (c.value != null ? c.value : '✓') : '✕'}</span>

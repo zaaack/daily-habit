@@ -2,9 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Slate palette: in light mode 950=lightest, 50=darkest (inverted)
-   so the existing `bg-slate-950` / `text-slate-100` etc. keep their
-   semantic role (bg vs text) across themes. */
+/*
+ * Slate palette: inverted so bg-slate-950/900 = light bg in light mode,
+ * dark bg in dark mode.  Text colours use the *other* end of the spectrum:
+ *   text-slate-50/100 = high-contrast text (dark in light, light in dark)
+ *   text-slate-200/300 = secondary text
+ *   text-slate-400/500 = muted / tertiary text
+ *
+ * NEVER use text-slate-600 through text-slate-950 — those are background
+ * shades and will be invisible in both themes.
+ */
 :root {
   --c-slate-950: 248 250 252;
   --c-slate-900: 255 255 255;

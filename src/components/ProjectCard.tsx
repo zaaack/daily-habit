@@ -37,7 +37,7 @@ export function ProjectCard({ project, dates }: { project: Project; dates: strin
         <span className="h-7 w-7 grid place-items-center rounded text-base" style={{ background: project.color + '33' }}>
           {project.emoji}
         </span>
-        <div className="font-medium text-base">{project.name}</div>
+        <div className="font-medium text-slate-200">{project.name}</div>
         {project.unit && <div className="text-xs text-slate-500">· {project.unit}</div>}
         <ChevronRight size={16} className="ml-auto text-slate-500" />
       </Link>

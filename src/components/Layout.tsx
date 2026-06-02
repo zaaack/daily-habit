@@ -16,7 +16,7 @@ export function Layout() {
       <header className="sticky top-0 z-30 bg-slate-950/85 backdrop-blur border-b border-slate-800">
         <div className="mx-auto max-w-3xl px-4 py-3 flex items-center gap-2">
           <Link to="/" className="flex items-center gap-2 text-lg font-semibold">
-            <span className="inline-block h-7 w-7 rounded-md bg-brand-500 grid place-items-center text-slate-950">✅</span>
+            <span className="inline-block h-7 w-7 rounded-md bg-brand-500 grid place-items-center text-white">✅</span>
             <span>Daily Habit</span>
           </Link>
           <div className="flex-1" />
