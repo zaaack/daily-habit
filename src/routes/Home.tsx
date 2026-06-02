@@ -15,8 +15,10 @@ export function Home() {
   const startXRef = useRef<number | null>(null)
 
   const today = todayStr()
+  const todayDow = new Date(today + 'T00:00:00').getDay()
+  const saturdayOffset = 6 - todayDow
   const dates: string[] = []
-  for (let i = DAYS_PER_PAGE - 1; i >= 0; i--) dates.push(shiftDateStr(today, endOffset - i))
+  for (let i = 6; i >= 0; i--) dates.push(shiftDateStr(today, endOffset + saturdayOffset - i))
 
   const oldest = dates[0]
   const newest = dates[dates.length - 1]
@@ -51,7 +53,7 @@ export function Home() {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-7 gap-1 text-[9px] text-slate-500">
+        <div className="grid grid-cols-7 gap-1 text-[9px] text-slate-400">
           {dates.map(d => {
             const dow = new Date(d + 'T00:00:00').getDay()
             const isToday = d === today
@@ -61,8 +63,9 @@ export function Home() {
                 key={'dow-' + d}
                 className={cn(
                   'text-center',
-                  isToday && 'text-brand-500 font-bold',
-                  isPast && !isToday && 'text-slate-600',
+                  isToday && 'text-slate-300 font-medium',
+                  isPast && 'text-slate-600',
+                  !isPast && !isToday && 'text-slate-500',
                 )}
               >
                 {'日一二三四五六'[dow]}

@@ -50,9 +50,7 @@ export function ProjectCard({ project, dates }: { project: Project; dates: strin
             <div
               key={d}
               className={cn(
-                'rounded-md',
-                isToday && 'ring-1 ring-brand-500/50',
-                !isPast && !isToday && 'opacity-50',
+                isToday ? '' : isPast ? 'opacity-40' : 'opacity-70',
               )}
             >
               <StatusCell
