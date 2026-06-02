@@ -108,20 +108,22 @@ export function Settings() {
       let processed = 0
       for (const item of raw) {
         if (!item.project?.id) continue
+        const now = Date.now()
         const { remoteEtag: _re, remotePath: _rp, ...proj } = item.project
-        await repo.upsertProject({ ...proj, remoteEtag: null, remotePath: makeRemotePath(item.project.id) })
+        await repo.upsertProject({ ...proj, updatedAt: now, remoteEtag: null, remotePath: makeRemotePath(item.project.id) })
         const checkins: Checkin[] = []
         for (const c of item.checkins ?? []) {
           if ('date' in c) {
             // readable format: { date, status, value, note, updatedAt }
-            checkins.push({ projectId: item.project.id, date: c.date, status: c.status, value: c.value, note: c.note, updatedAt: c.updatedAt })
+            checkins.push({ projectId: item.project.id, date: c.date, status: c.status, value: c.value, note: c.note, updatedAt: now })
           } else if (typeof c.d === 'number') {
             // compact sync format: { d: epochDay, s: 0|1, ... }
             const { compactToCheckin } = await import('@/sync/merge')
-            checkins.push(compactToCheckin(item.project.id, c))
+            const ck = compactToCheckin(item.project.id, c)
+            checkins.push({ ...ck, updatedAt: now })
           } else {
             // old abbreviated format: { d: dateStr, s: 'success'|'fail', ... }
-            checkins.push({ projectId: item.project.id, date: c.d, status: c.s, value: c.v, note: c.n, updatedAt: c.u })
+            checkins.push({ projectId: item.project.id, date: c.d, status: c.s, value: c.v, note: c.n, updatedAt: now })
           }
         }
         if (checkins.length > 0) await repo.bulkUpsertCheckins(checkins)
@@ -192,7 +194,7 @@ export function Settings() {
         sort: 0,
         archived: 0,
         createdAt: ((habit.create_t as number) ?? Math.floor(now / 1000)) * 1000,
-        updatedAt: ((habit.modify_t as number) ?? Math.floor(now / 1000)) * 1000,
+        updatedAt: now,
         remoteEtag: null,
         remotePath: makeRemotePath(id, DEFAULT_REMOTE_DIR),
         deleted: ((habit.status as number) ?? 1) === 1 ? 0 : 1,
@@ -212,7 +214,7 @@ export function Settings() {
             status: ((rec.record_value as number) ?? 1) === 1 ? 'success' : 'fail',
             value: (rec.record_value as number | null) ?? null,
             note: combinedNote,
-            updatedAt: ((rec.modify_t as number) ?? Math.floor(now / 1000)) * 1000,
+            updatedAt: now,
           })
         }
         await repo.bulkUpsertCheckins(checkins)
