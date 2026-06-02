@@ -156,7 +156,7 @@ jobs:
               console.log(`Uploaded: ${file}`);
             }
 
-  # ── Desktop (Linux ARM64 / macOS / Windows) ────────────────────────
+  # ── Desktop (Linux / macOS / Windows) ───────────────────────────────
   build-desktop:
     needs: create-release
     if: github.event_name == 'push' || github.event.inputs.targets != ''
@@ -164,7 +164,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: ubuntu-24.04-arm
+          - platform: ubuntu-latest
             args: ''
           - platform: macos-latest
             args: '--target aarch64-apple-darwin'
