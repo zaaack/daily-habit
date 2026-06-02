@@ -69,6 +69,7 @@
     "data": "数据",
     "exportJson": "导出 JSON",
     "importJson": "导入 JSON",
+    "importMhabit": "导入 mhabit",
     "clear": "清空",
     "invalidFormat": "文件格式不正确",
     "importFailed": "导入失败：{{msg}}",

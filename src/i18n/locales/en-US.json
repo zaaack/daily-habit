@@ -69,6 +69,7 @@
     "data": "Data",
     "exportJson": "Export JSON",
     "importJson": "Import JSON",
+    "importMhabit": "Import mhabit",
     "clear": "Clear",
     "invalidFormat": "Invalid file format",
     "importFailed": "Import failed: {{msg}}",

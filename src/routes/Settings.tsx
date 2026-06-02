@@ -79,15 +79,22 @@ export function Settings() {
     URL.revokeObjectURL(url)
   }
 
-  async function handleImport(file: File) {
+  async function handleImportMhabitFile(file: File) {
     try {
       const text = await file.text()
       const parsed = JSON.parse(text)
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray(parsed.habits)) {
-        await importMhabit(parsed.habits)
-        return
-      }
-      const data = parsed as ProjectFile[]
+      const habits = parsed?.habits
+      if (!Array.isArray(habits)) { alert(t('settings.invalidFormat')); return }
+      await importMhabit(habits)
+    } catch (e) {
+      alert(t('settings.importFailed', { msg: e instanceof Error ? e.message : String(e) }))
+    }
+  }
+
+  async function handleImport(file: File) {
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text) as ProjectFile[]
       if (!Array.isArray(data)) {
         alert(t('settings.invalidFormat'))
         return
@@ -216,6 +223,10 @@ export function Settings() {
           <label className="btn-outline cursor-pointer">
             <Upload size={14} /> {t('settings.importJson')}
             <input type="file" accept="application/json" hidden onChange={e => e.target.files?.[0] && handleImport(e.target.files[0])} />
+          </label>
+          <label className="btn-outline cursor-pointer">
+            <Upload size={14} /> {t('settings.importMhabit')}
+            <input type="file" accept="application/json" hidden onChange={e => e.target.files?.[0] && handleImportMhabitFile(e.target.files[0])} />
           </label>
           <div className="flex-1" />
           <button className="btn-outline text-rose-500" onClick={handleClear}>
