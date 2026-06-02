@@ -38,9 +38,9 @@ export function Home() {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div className="card">
-        <div className="flex items-center gap-2 text-[11px] text-slate-500 mb-1">
+        <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
           <span className="tabular-nums">{rangeLabel}</span>
           <div className="flex-1" />
           {!isCurrent && (
@@ -49,11 +49,11 @@ export function Home() {
               className="text-brand-500 hover:text-brand-400 inline-flex items-center gap-0.5"
               title="回到本周"
             >
-              <RotateCcw size={10} /> 本周
+              <RotateCcw size={12} /> 本周
             </button>
           )}
         </div>
-        <div className="grid grid-cols-7 gap-1 text-[9px]">
+        <div className="grid grid-cols-7 gap-1.5 text-[11px]">
           {dates.map(d => {
             const dow = new Date(d + 'T00:00:00').getDay()
             const isToday = d === today
@@ -81,7 +81,7 @@ export function Home() {
         </div>
       ) : (
         <div
-          className="space-y-2"
+          className="space-y-3"
           style={{ touchAction: 'pan-y' }}
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}

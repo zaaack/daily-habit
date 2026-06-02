@@ -32,16 +32,16 @@ export function ProjectCard({ project, dates }: { project: Project; dates: strin
     <div className="card">
       <Link
         to={`/project/${project.id}`}
-        className="flex items-center gap-2 mb-1.5 active:opacity-70"
+        className="flex items-center gap-2 mb-2 active:opacity-70"
       >
-        <span className="h-6 w-6 grid place-items-center rounded text-sm" style={{ background: project.color + '33' }}>
+        <span className="h-7 w-7 grid place-items-center rounded text-base" style={{ background: project.color + '33' }}>
           {project.emoji}
         </span>
         <div className="font-medium text-sm">{project.name}</div>
-        {project.unit && <div className="text-[11px] text-slate-500">· {project.unit}</div>}
-        <ChevronRight size={14} className="ml-auto text-slate-500" />
+        {project.unit && <div className="text-xs text-slate-500">· {project.unit}</div>}
+        <ChevronRight size={16} className="ml-auto text-slate-500" />
       </Link>
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1.5">
         {dates.map(d => {
           const c = byDate.get(d)
           const isFuture = d > today
