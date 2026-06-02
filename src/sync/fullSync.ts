@@ -8,7 +8,7 @@ import { makeRemotePath } from '@/db/schema'
 const SYNC_CONFIG_KEY = 'webdav.config'
 
 /** 防止并发 runFullSync */
-let _fullSyncInProgress = false
+export let _fullSyncInProgress = false
 
 export function getSyncConfig(): WebDavConfig | null {
   try {
@@ -87,7 +87,9 @@ export async function runFullSync(
   let changed = false
   const refreshedProjects: Project[] = []
 
-  for (const p of localProjects) {
+  for (const p0 of localProjects) {
+    // 每次迭代重新读取本地最新数据，防止并发导入/修改导致使用过期快照
+    const p = await repo.getProject(p0.id) ?? p0
     const filename = p.remotePath.split('/').pop()!
     const remoteEtag = remoteByPath.get(filename) ?? null
     console.log('[sync] check local project', p.name, 'filename:', filename, 'remoteEtag:', remoteEtag)
@@ -143,11 +145,9 @@ export async function runFullSync(
       remoteByPath.delete(filename)
       continue
     }
-    // 重新读取本地最新数据（防止并发导入等修改导致使用过期快照）
-    const freshProject = await repo.getProject(p.id) ?? p
     const localCheckins = await repo.getCheckinsAll(p.id)
     const { project, checkinsAll: mergedAll, conflicts, changed: merged } = mergeProjectFile(
-      stripProject(freshProject), localCheckins, file,
+      stripProject(p), localCheckins, file,
     )
 
     if (conflicts.length > 0) {
@@ -156,7 +156,7 @@ export async function runFullSync(
 
     if (merged) {
       const nextProject: Omit<Project, 'remoteEtag'> = { ...project, remotePath: p.remotePath }
-      await repo.upsertProject({ ...freshProject, ...nextProject, remoteEtag })
+      await repo.upsertProject({ ...p, ...nextProject, remoteEtag })
 
       // 合并: merge 结果(含 tombstone) + 本地-only
       const mergedDates = new Set(mergedAll.map(c => c.date))
@@ -167,14 +167,14 @@ export async function runFullSync(
 
       // 重新上传完整文件 (mergedAll 已含 tombstone + 本地-only)
       try {
-        const uploadFile = await buildFile({ ...freshProject, ...nextProject }, mergedAll)
+        const uploadFile = await buildFile({ ...p, ...nextProject }, mergedAll)
         await client.putFileContents(p.remotePath, JSON.stringify(uploadFile, null, 2), { contentLength: false })
         const newEtag = await getDirEntryEtag(client, p.remotePath)
-        if (newEtag) await repo.upsertProject({ ...freshProject, ...nextProject, remoteEtag: newEtag })
+        if (newEtag) await repo.upsertProject({ ...p, ...nextProject, remoteEtag: newEtag })
       } catch { /* 留待下次重试 */ }
       changed = true
     }
-    refreshedProjects.push({ ...freshProject, remoteEtag })
+    refreshedProjects.push({ ...p, remoteEtag })
     remoteByPath.delete(filename)
   }
 

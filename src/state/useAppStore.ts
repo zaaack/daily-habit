@@ -8,7 +8,7 @@ import {
     DEFAULT_REMOTE_DIR,
 } from "@/db";
 import type { Project, Checkin, SyncState, CheckStatus } from "@/db/types";
-import { runFullSync, syncOneProject } from "@/sync/fullSync";
+import { runFullSync, syncOneProject, _fullSyncInProgress } from "@/sync/fullSync";
 import type { ConflictItem } from "@/db/types";
 
 function sortProjects(projects: Project[]): Project[] {
@@ -266,6 +266,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     },
 
     async triggerSync() {
+        // 等待正在进行的同步完成，确保本次请求不会被静默跳过
+        while (_fullSyncInProgress) {
+            await new Promise((r) => setTimeout(r, 200));
+        }
         const repo = await getRepo();
         set((s) => ({
             sync: { ...s.sync, status: "syncing", pending: s.sync.pending + 1 },
