@@ -144,7 +144,7 @@ export async function runFullSync(
       continue
     }
     const localCheckins = await repo.getCheckinsAll(p.id)
-    const { project, checkinsAll: mergedAll, checkins: mergedActive, conflicts, changed: merged } = mergeProjectFile(
+    const { project, checkinsAll: mergedAll, conflicts, changed: merged } = mergeProjectFile(
       stripProject(p), localCheckins, file,
     )
 
@@ -155,22 +155,17 @@ export async function runFullSync(
     if (merged) {
       const nextProject: Omit<Project, 'remoteEtag'> = { ...project, remotePath: p.remotePath }
       await repo.upsertProject({ ...p, ...nextProject, remoteEtag })
-      for (const c of mergedAll) await repo.upsertCheckin(c)
 
-      // 补充本地-only 的 active checkin
+      // 合并: merge 结果(含 tombstone) + 本地-only
       const mergedDates = new Set(mergedAll.map(c => c.date))
       for (const c of localCheckins) {
-        if (!mergedDates.has(c.date) && c.status !== 'deleted') {
-          mergedActive.push(c)
-          mergedDates.add(c.date)
-        }
+        if (!mergedDates.has(c.date)) mergedAll.push(c)
       }
-      for (const c of mergedActive) await repo.upsertCheckin(c)
+      for (const c of mergedAll) await repo.upsertCheckin(c)
 
-      // 重新上传含 tombstone 的完整文件
+      // 重新上传完整文件 (mergedAll 已含 tombstone + 本地-only)
       try {
-        const uploadCheckins = mergedActive.concat(localCheckins.filter(c => !mergedDates.has(c.date) && c.status === 'deleted'))
-        const uploadFile = await buildFile({ ...p, ...nextProject }, uploadCheckins)
+        const uploadFile = await buildFile({ ...p, ...nextProject }, mergedAll)
         await client.putFileContents(p.remotePath, JSON.stringify(uploadFile, null, 2), { contentLength: false })
         const newEtag = await getDirEntryEtag(client, p.remotePath)
         if (newEtag) await repo.upsertProject({ ...p, ...nextProject, remoteEtag: newEtag })
@@ -283,26 +278,23 @@ export async function syncOneProject(projectId: string): Promise<void> {
     }
     return
   }
-  const { project, checkinsAll: mergedAll, checkins: mergedActive, conflicts } = mergeProjectFile(stripProject(p), localCheckins, remote)
+  const { project, checkinsAll: mergedAll, conflicts } = mergeProjectFile(stripProject(p), localCheckins, remote)
   if (conflicts.length) {
     const { useAppStore } = await import('@/state/useAppStore')
     useAppStore.setState(s => ({ conflicts: { ...s.conflicts, [p.id]: conflicts } }))
   }
   if (conflicts.length === 0) {
     await repo.upsertProject({ ...p, ...project, remoteEtag })
-    for (const c of mergedAll) await repo.upsertCheckin(c)
 
+    // 合并: merge 结果(含 tombstone) + 本地-only
     const mergedDates = new Set(mergedAll.map(c => c.date))
     for (const c of localCheckins) {
-      if (!mergedDates.has(c.date) && c.status !== 'deleted') {
-        mergedActive.push(c)
-        mergedDates.add(c.date)
-      }
+      if (!mergedDates.has(c.date)) mergedAll.push(c)
     }
-    for (const c of mergedActive) await repo.upsertCheckin(c)
+    for (const c of mergedAll) await repo.upsertCheckin(c)
+
     try {
-      const uploadCheckins = mergedActive.concat(localCheckins.filter(c => !mergedDates.has(c.date) && c.status === 'deleted'))
-      const file = await buildFile({ ...p, ...project }, uploadCheckins)
+      const file = await buildFile({ ...p, ...project }, mergedAll)
       const res = await client.putFileContents(p.remotePath, JSON.stringify(file, null, 2), {
         contentLength: false,
       })
