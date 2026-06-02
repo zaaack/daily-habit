@@ -203,6 +203,8 @@ jobs:
           projectRoot: ${{ github.workspace }}
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
+          uploadUpdaterSignatures: false
+          uploadUpdaterJson: false
 
   # ── Publish Release ────────────────────────────────────────────────
   publish-release:
