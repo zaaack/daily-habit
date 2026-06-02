@@ -1,10 +1,15 @@
 /** @type {import('tailwindcss').Config} */
+const slateShades = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]
+const slateVar = (k) => `rgb(var(--c-slate-${k}) / <alpha-value>)`
+const slateMap = Object.fromEntries(slateShades.map((k) => [k, slateVar(k)]))
+
 export default {
   darkMode: 'class',
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
+        slate: slateMap,
         brand: {
           50: '#f0fdf4',
           100: '#dcfce7',

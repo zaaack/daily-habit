@@ -2,26 +2,61 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Slate palette: in light mode 950=lightest, 50=darkest (inverted)
+   so the existing `bg-slate-950` / `text-slate-100` etc. keep their
+   semantic role (bg vs text) across themes. */
+:root {
+  --c-slate-950: 248 250 252;
+  --c-slate-900: 255 255 255;
+  --c-slate-800: 226 232 240;
+  --c-slate-700: 203 213 225;
+  --c-slate-600: 148 163 184;
+  --c-slate-500: 100 116 139;
+  --c-slate-400: 71 85 105;
+  --c-slate-300: 51 65 85;
+  --c-slate-200: 30 41 59;
+  --c-slate-100: 15 23 42;
+  --c-slate-50: 2 6 23;
+}
+.dark {
+  --c-slate-950: 2 6 23;
+  --c-slate-900: 15 23 42;
+  --c-slate-800: 30 41 59;
+  --c-slate-700: 51 65 85;
+  --c-slate-600: 71 85 105;
+  --c-slate-500: 100 116 139;
+  --c-slate-400: 148 163 184;
+  --c-slate-300: 203 213 225;
+  --c-slate-200: 226 232 240;
+  --c-slate-100: 241 245 249;
+  --c-slate-50: 248 250 252;
+}
+
 @layer base {
   html, body, #root { height: 100%; }
-  body { -webkit-tap-highlight-color: transparent; }
+  body { -webkit-tap-highlight-color: transparent; transition: background-color 120ms ease; }
   *, *::before, *::after { box-sizing: border-box; }
   button { -webkit-touch-callout: none; user-select: none; }
 }
 
 @layer components {
   .card {
-    @apply rounded-2xl bg-slate-900/70 border border-slate-800 backdrop-blur p-4;
+    @apply rounded-2xl border backdrop-blur p-3;
+    background-color: rgb(var(--c-slate-900) / 0.7);
+    border-color: rgb(var(--c-slate-800) / 1);
   }
   .btn {
     @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
   }
-  .btn-primary { @apply btn bg-brand-500 text-slate-950 hover:bg-brand-400; }
-  .btn-ghost   { @apply btn text-slate-300 hover:bg-slate-800; }
-  .btn-outline { @apply btn border border-slate-700 text-slate-200 hover:bg-slate-800; }
+  .btn-primary { @apply btn bg-brand-500 text-slate-50 hover:bg-brand-400; }
+  .btn-ghost   { @apply btn hover:bg-slate-800/60; color: rgb(var(--c-slate-300) / 1); }
+  .btn-outline { @apply btn border border-slate-700 text-slate-200 hover:bg-slate-800/60; }
   .input {
-    @apply w-full rounded-lg bg-slate-800/70 border border-slate-700 px-3 py-2 text-sm
+    @apply w-full rounded-lg border px-3 py-2 text-sm
            placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500/60;
+    background-color: rgb(var(--c-slate-800) / 0.7);
+    border-color: rgb(var(--c-slate-700) / 1);
+    color: rgb(var(--c-slate-100) / 1);
   }
-  .label { @apply text-xs uppercase tracking-wide text-slate-400; }
+  .label { @apply text-xs uppercase tracking-wide; color: rgb(var(--c-slate-400) / 1); }
 }

@@ -1,17 +1,18 @@
-import { useEffect, useState } from 'react'
-import * as Slider from '@radix-ui/react-slider'
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/state/useAppStore'
 import { StatusCell } from './StatusCell'
 import type { Project, Checkin } from '@/db/types'
 import { shiftDateStr, todayStr } from '@/db/schema'
-import { cn } from '@/lib/cn'
+import { RotateCcw } from 'lucide-react'
+
+const DAYS_PER_PAGE = 7
 
 export function ProjectCard({ project }: { project: Project }) {
-  const recentDays = useAppStore(s => s.recentDays)
   const cycle = useAppStore(s => s.cycleCheckin)
   const [checkins, setCheckins] = useState<Checkin[]>([])
-  const conflicts = useAppStore(s => s.conflicts[project.id])
   const [tick, setTick] = useState(0)
+  const [endOffset, setEndOffset] = useState(0)  // 0=ends at today; negative=older
+  const startXRef = useRef<number | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -26,24 +27,64 @@ export function ProjectCard({ project }: { project: Project }) {
     return () => { alive = false; clearInterval(t) }
   }, [project.id])
 
-  const dates: string[] = []
   const today = todayStr()
-  for (let i = recentDays - 1; i >= 0; i--) dates.push(shiftDateStr(today, -i))
+  const dates: string[] = []
+  for (let i = DAYS_PER_PAGE - 1; i >= 0; i--) dates.push(shiftDateStr(today, endOffset - i))
   const byDate = new Map(checkins.map(c => [c.date, c]))
 
+  const start = dates[0]
+  const end = dates[dates.length - 1]
+  const sameMonth = start.slice(0, 7) === end.slice(0, 7)
+  const rangeLabel = sameMonth
+    ? `${start.slice(5)} – ${end.slice(5)}`
+    : `${start.slice(5)} – ${end.slice(5)}`
+
+  const isCurrent = endOffset === 0
+
+  function onTouchStart(e: React.TouchEvent) {
+    startXRef.current = e.touches[0].clientX
+  }
+  function onTouchEnd(e: React.TouchEvent) {
+    if (startXRef.current == null) return
+    const dx = e.changedTouches[0].clientX - startXRef.current
+    startXRef.current = null
+    if (Math.abs(dx) < 60) return
+    if (dx < 0) setEndOffset(v => v + DAYS_PER_PAGE)   // 手指向左 → 较新
+    else setEndOffset(v => v - DAYS_PER_PAGE)          // 手指向右 → 较旧
+  }
+
   return (
-    <div className="card">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="h-6 w-6 grid place-items-center rounded" style={{ background: project.color + '33' }}>
-          <span className="text-sm">{project.emoji}</span>
+    <div
+      className="card"
+      style={{ touchAction: 'pan-y' }}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className="h-6 w-6 grid place-items-center rounded text-sm" style={{ background: project.color + '33' }}>
+          {project.emoji}
         </span>
-        <div className="font-semibold">{project.name}</div>
-        {project.unit && <div className="text-xs text-slate-500">· {project.unit}</div>}
-        {conflicts && conflicts.length > 0 && (
-          <span className="ml-auto text-[10px] text-amber-300 bg-amber-900/30 border border-amber-900/50 rounded px-1.5 py-0.5">同步冲突</span>
+        <div className="font-medium text-sm">{project.name}</div>
+        {project.unit && <div className="text-[11px] text-slate-500">· {project.unit}</div>}
+        <div className="flex-1" />
+        <span className="text-[11px] text-slate-500 tabular-nums">{rangeLabel}</span>
+        {!isCurrent && (
+          <button
+            onClick={() => setEndOffset(0)}
+            className="text-[11px] text-brand-500 hover:text-brand-400 inline-flex items-center gap-0.5"
+            title="回到本周"
+          >
+            <RotateCcw size={10} /> 本周
+          </button>
         )}
       </div>
-      <div className="flex items-center gap-1.5 flex-wrap pb-1">
+      <div className="grid grid-cols-7 gap-1 text-[9px] text-slate-500 mb-0.5 px-0.5">
+        {dates.map(d => {
+          const dow = new Date(d + 'T00:00:00').getDay()
+          return <div key={'dow-' + d} className="text-center">{'日一二三四五六'[dow]}</div>
+        })}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
         {dates.map(d => {
           const c = byDate.get(d)
           return (
@@ -54,43 +95,16 @@ export function ProjectCard({ project }: { project: Project }) {
               checkin={c}
               unit={project.unit}
               color={project.color}
+              compact
               refreshKey={tick}
               onCycle={() => void cycle(project.id, d)}
             />
           )
         })}
-        <div className="text-[10px] text-slate-500 ml-1">
-          {dates[0].slice(5)} ~ {dates[dates.length - 1].slice(5)}
-        </div>
       </div>
-    </div>
-  )
-}
-
-export function RecentDaysSlider() {
-  const recentDays = useAppStore(s => s.recentDays)
-  const setRecentDays = useAppStore(s => s.setRecentDays)
-  return (
-    <div className="card flex items-center gap-3">
-      <div className="text-xs text-slate-400 whitespace-nowrap">显示最近</div>
-      <Slider.Root
-        className="relative flex items-center select-none touch-none w-full h-5"
-        value={[recentDays]}
-        onValueChange={v => setRecentDays(v[0])}
-        min={3}
-        max={7}
-        step={1}
-      >
-        <Slider.Track className="bg-slate-800 relative grow rounded-full h-1.5">
-          <Slider.Range className="absolute bg-brand-500 rounded-full h-full" />
-        </Slider.Track>
-        <Slider.Thumb
-          className="block h-4 w-4 bg-brand-500 rounded-full shadow-md focus:outline-none focus:ring-2 focus:ring-brand-500/50"
-          aria-label="天数"
-        />
-      </Slider.Root>
-      <div className={cn('text-sm font-semibold w-6 text-right tabular-nums')}>{recentDays}</div>
-      <div className="text-[10px] text-slate-500">天</div>
+      <div className="grid grid-cols-7 gap-1 text-[9px] text-slate-500 mt-0.5 px-0.5 tabular-nums">
+        {dates.map(d => <div key={'d-' + d} className="text-center">{d.slice(8)}</div>)}
+      </div>
     </div>
   )
 }

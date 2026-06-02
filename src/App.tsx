@@ -23,6 +23,20 @@ const router = createMemoryRouter([
   },
 ])
 
+function getStoredTheme(): 'auto' | 'light' | 'dark' {
+  try {
+    const v = localStorage.getItem('theme')
+    if (v === 'light' || v === 'dark') return v
+  } catch { /* noop */ }
+  return 'auto'
+}
+
+function applyThemeFromStored() {
+  const mode = getStoredTheme()
+  const dark = mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  document.documentElement.classList.toggle('dark', dark)
+}
+
 export function App() {
   const init = useAppStore(s => s.init)
   const ready = useAppStore(s => s.ready)
@@ -34,9 +48,16 @@ export function App() {
     void init()
   }, [init])
 
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const onChange = () => { if (getStoredTheme() === 'auto') applyThemeFromStored() }
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
   if (!ready) {
     return (
-      <div className="grid h-full place-items-center text-slate-400">
+      <div className="grid h-full place-items-center text-slate-500">
         <div className="animate-pulse">正在准备…</div>
       </div>
     )

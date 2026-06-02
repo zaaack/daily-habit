@@ -41,7 +41,13 @@ export function StatusCell({ projectId, date, checkin, unit, color, compact, ref
     <>
       <button
         className={cn(base, sizeCls, cls)}
-        style={status === 'success' ? { background: color, borderColor: color } : status === 'fail' ? { background: '#ef4444', borderColor: '#ef4444' } : undefined}
+        style={
+          status === 'success'
+            ? { background: color, borderColor: color, color: '#020617' }
+            : status === 'fail'
+            ? { background: '#ef4444', borderColor: '#ef4444', color: '#fff' }
+            : undefined
+        }
         onClick={onCycle}
         onDoubleClick={(e) => { e.preventDefault(); setOpen(true) }}
         onContextMenu={(e) => { e.preventDefault(); setOpen(true) }}

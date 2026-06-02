@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { nanoid } from 'nanoid'
 import { getRepo, makeProjectId, makeRemotePath, nowMs, todayStr, DEFAULT_REMOTE_DIR } from '@/db'
 import type { Project, Checkin, SyncState, CheckStatus } from '@/db/types'
 import { runFullSync, syncOneProject } from '@/sync/fullSync'
@@ -8,12 +7,10 @@ import type { ConflictItem } from '@/db/types'
 interface AppState {
   ready: boolean
   projects: Project[]
-  recentDays: number
   sync: SyncState
   conflicts: Record<string, ConflictItem[]>
 
   init(): Promise<void>
-  setRecentDays(n: number): void
 
   addProject(input: { name: string; unit: string | null; emoji: string; color: string }): Promise<Project>
   updateProject(id: string, patch: Partial<Pick<Project, 'name' | 'unit' | 'emoji' | 'color'>>): Promise<void>
@@ -30,19 +27,16 @@ interface AppState {
 export const useAppStore = create<AppState>((set, get) => ({
   ready: false,
   projects: [],
-  recentDays: 5,
   sync: { status: 'idle', at: null, error: null, pending: 0 },
   conflicts: {},
 
   async init() {
     try {
       const repo = await getRepo()
-      const recent = await repo.getKV<number>('recentDays')
       const lastSyncAt = await repo.getKV<number>('sync.lastAt')
       const lastSyncErr = await repo.getKV<string>('sync.lastError')
       const projects = await repo.listProjects()
       set({
-        recentDays: recent ?? 5,
         projects,
         sync: {
           status: lastSyncErr ? 'error' : 'ok',
@@ -59,11 +53,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         ready: true,
       })
     }
-  },
-
-  setRecentDays(n) {
-    set({ recentDays: n })
-    void getRepo().then(r => r.setKV('recentDays', n))
   },
 
   async addProject({ name, unit, emoji, color }) {
@@ -209,5 +198,4 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 }))
 
-export const newCheckinId = () => nanoid(8)
 export { todayStr }

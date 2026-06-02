@@ -4,12 +4,18 @@ import { getSyncConfig, setSyncConfig, testConnection, syncOneProject } from '@/
 import type { WebDavConfig } from '@/sync/webdav'
 import { DEFAULT_REMOTE_DIR } from '@/db/schema'
 import { getRepo } from '@/db'
-import { Download, Upload, Trash2 } from 'lucide-react'
+import { Download, Upload, Trash2, Sun, Moon, Monitor } from 'lucide-react'
 import { format } from 'date-fns'
 
+type ThemeMode = 'auto' | 'light' | 'dark'
+
+function applyTheme(mode: ThemeMode) {
+  const dark = mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  document.documentElement.classList.toggle('dark', dark)
+  try { localStorage.setItem('theme', mode) } catch { /* noop */ }
+}
+
 export function Settings() {
-  const recentDays = useAppStore(s => s.recentDays)
-  const setRecentDays = useAppStore(s => s.setRecentDays)
   const sync = useAppStore(s => s.sync)
   const triggerSync = useAppStore(s => s.triggerSync)
 
@@ -17,13 +23,23 @@ export function Settings() {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [savedAt, setSavedAt] = useState<number | null>(null)
+  const [theme, setTheme] = useState<ThemeMode>('auto')
 
   useEffect(() => {
     void (async () => {
       const c = await getSyncConfig(await getRepo())
       if (c) setCfg(c)
     })()
+    try {
+      const stored = localStorage.getItem('theme') as ThemeMode | null
+      if (stored === 'light' || stored === 'dark' || stored === 'auto') setTheme(stored)
+    } catch { /* noop */ }
   }, [])
+
+  function setThemeMode(m: ThemeMode) {
+    setTheme(m)
+    applyTheme(m)
+  }
 
   async function saveCfg() {
     await setSyncConfig(await getRepo(), cfg)
@@ -112,27 +128,23 @@ export function Settings() {
           <button className="btn-ghost" onClick={() => void triggerSync()}>立即同步</button>
         </div>
         {testResult && (
-          <div className={`text-xs ${testResult.ok ? 'text-brand-400' : 'text-rose-400'}`}>{testResult.message}</div>
+          <div className={`text-xs ${testResult.ok ? 'text-brand-500' : 'text-rose-500'}`}>{testResult.message}</div>
         )}
         {savedAt && <div className="text-[11px] text-slate-500">已保存于 {format(new Date(savedAt), 'HH:mm:ss')}</div>}
-        <div className="text-xs text-slate-400 pt-1 border-t border-slate-800">
+        <div className="text-xs text-slate-500 pt-1 border-t border-slate-800">
           状态：{sync.status} {sync.at && `· ${format(new Date(sync.at), 'MM-dd HH:mm')}`}
-          {sync.error && <div className="text-rose-400 mt-1">{sync.error}</div>}
+          {sync.error && <div className="text-rose-500 mt-1">{sync.error}</div>}
         </div>
       </div>
 
       <div className="card space-y-2">
-        <div className="text-sm font-semibold">显示</div>
-        <div className="flex items-center gap-2">
-          <div className="text-xs text-slate-400 w-20">最近天数</div>
-          <input
-            type="range" min={3} max={7} step={1}
-            value={recentDays}
-            onChange={e => setRecentDays(Number(e.target.value))}
-            className="flex-1 accent-brand-500"
-          />
-          <div className="text-sm font-semibold w-6 text-right">{recentDays}</div>
+        <div className="text-sm font-semibold">外观</div>
+        <div className="grid grid-cols-3 gap-1.5">
+          <ThemeBtn active={theme === 'auto'} onClick={() => setThemeMode('auto')} icon={<Monitor size={14} />} label="自动" />
+          <ThemeBtn active={theme === 'light'} onClick={() => setThemeMode('light')} icon={<Sun size={14} />} label="浅色" />
+          <ThemeBtn active={theme === 'dark'} onClick={() => setThemeMode('dark')} icon={<Moon size={14} />} label="深色" />
         </div>
+        <div className="text-[11px] text-slate-500">"自动" 跟随系统设置；可手动锁定。</div>
       </div>
 
       <div className="card space-y-2">
@@ -144,13 +156,24 @@ export function Settings() {
             <input type="file" accept="application/json" hidden onChange={e => e.target.files?.[0] && handleImport(e.target.files[0])} />
           </label>
           <div className="flex-1" />
-          <button className="btn-outline text-rose-400 border-rose-900/40" onClick={handleClear}>
+          <button className="btn-outline text-rose-500" onClick={handleClear}>
             <Trash2 size={14} /> 清空
           </button>
         </div>
       </div>
 
-      <div className="text-center text-[11px] text-slate-600 pt-2">Daily Habit · v0.0.1</div>
+      <div className="text-center text-[11px] text-slate-500 pt-2">Daily Habit · v0.0.1</div>
     </div>
+  )
+}
+
+function ThemeBtn({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className={active ? 'btn-primary text-xs' : 'btn-outline text-xs'}
+    >
+      {icon} {label}
+    </button>
   )
 }
