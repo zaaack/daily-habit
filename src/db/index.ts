@@ -1,4 +1,5 @@
 import type { Repo } from './repo/Repo'
+import { SqlocalRepo } from './repo/SqlocalRepo'
 import { DexieRepo } from './repo/DexieRepo'
 import { SqliteRepo } from './repo/SqliteRepo'
 import { isAndroid } from '@/lib/platform'
@@ -11,7 +12,23 @@ export async function getRepo(): Promise<Repo> {
   if (_initPromise) return _initPromise
 
   _initPromise = (async () => {
-    const repo: Repo = isAndroid ? new SqliteRepo() : new DexieRepo()
+    if (isAndroid) {
+      const repo = new SqliteRepo()
+      await repo.init()
+      _instance = repo
+      return repo
+    }
+
+    try {
+      const repo = new SqlocalRepo()
+      await repo.init()
+      _instance = repo
+      return repo
+    } catch {
+      console.warn('Sqlocal/OPFS unavailable, falling back to Dexie')
+    }
+
+    const repo = new DexieRepo()
     await repo.init()
     _instance = repo
     return repo

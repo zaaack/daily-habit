@@ -2,6 +2,7 @@ import path from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import sqlocalVitePlugin from 'sqlocal/vite'
 
 export default defineConfig({
   base: '/daily-habit/',
@@ -12,6 +13,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    sqlocalVitePlugin({ coi: true }),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
