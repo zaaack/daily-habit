@@ -91,14 +91,6 @@ export function mergeProjectFile(
       continue
     }
     const winner = lc.updatedAt > rc.updatedAt ? lc : rc
-    if (lc.status !== rc.status || (lc.value ?? null) !== (rc.value ?? null) || (lc.note ?? null) !== (rc.note ?? null)) {
-      conflicts.push({
-        date: rc.date,
-        field: lc.status !== rc.status ? 'status' : (lc.value !== rc.value ? 'value' : 'note'),
-        local: pickField(lc, lc.status !== rc.status ? 'status' : (lc.value !== rc.value ? 'value' : 'note')),
-        remote: pickField(rc, lc.status !== rc.status ? 'status' : (lc.value !== rc.value ? 'value' : 'note')),
-      })
-    }
     merged.push(winner)
   }
 
