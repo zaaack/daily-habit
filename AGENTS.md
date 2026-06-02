@@ -35,7 +35,7 @@ Path alias: `@/*` → `src/*` (set in both `tsconfig.json` and `vite.config.ts`)
 
 ## Deploy
 - Web: push to `main` → `.github/workflows/deploy.yml` (pnpm 9, Node 22) builds and publishes `docs/` to GitHub Pages at `/daily-habit/`. The workflow copies `docs/index.html` to `docs/404.html` for SPA routing — local builds don't need this.
-- Cloudflare Pages: `pnpm build:cf` outputs to `docs/`. Deploy `docs/` via Cloudflare Pages dashboard (or connect repo). `public/_headers` provides COOP/COEP headers; `public/_redirects` handles SPA fallback. Set build command to `pnpm build:cf` and publish directory to `docs`.
+- Cloudflare Workers: `pnpm build:cf && npx wrangler deploy` deploys `docs/` via Cloudflare Workers + Assets. `wrangler.jsonc` sets `not_found_handling: "single-page-application"` for SPA fallback. `public/_headers` provides COOP/COEP headers (native Workers support).
 - Android: local-only, no CI.
 
 ## Conventions
