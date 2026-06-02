@@ -5,8 +5,9 @@
 
 ## Commands
 - `pnpm dev` — Vite dev (browser only, runs against Dexie)
-- `pnpm build` — **runs `scripts/generate-icons.mjs` first**, then `tsc -b`, then `vite build`. Touching `public/favicon.svg` only takes effect after this.
-- `pnpm lint` — ESLint, flat config. Only `**/*.{ts,tsx}`; ignores `dist`, `node_modules`, `android`, `.capacitor`, `*.config.js`, `*.config.ts`. `no-unused-vars` is off; `tsc` enforces unused locals/params.
+- `pnpm build` — **runs `scripts/generate-icons.mjs` first**, then `tsc -b`, then `vite build`. Outputs to `docs/`. Touching `public/favicon.svg` only takes effect after this.
+- `pnpm build:cf` — `VITE_BASE_URL=/ pnpm build` — builds for Cloudflare Pages (root path).
+- `pnpm lint` — ESLint, flat config. Only `**/*.{ts,tsx}`; ignores `docs`, `node_modules`, `android`, `.capacitor`, `*.config.js`, `*.config.ts`. `no-unused-vars` is off; `tsc` enforces unused locals/params.
 - `pnpm android:build` — `pnpm build && cap sync android && cd android && ./gradlew assembleDebug`. APK lands at `android/app/build/outputs/apk/debug/app-debug.apk`. Needs local JDK + Android SDK (not in CI).
 - `pnpm cap:sync` / `pnpm cap:open:android` — Capacitor CLI helpers.
 
@@ -24,15 +25,17 @@ Path alias: `@/*` → `src/*` (set in both `tsconfig.json` and `vite.config.ts`)
 
 ## Quirks
 - `vite.config.ts` has `base: '/daily-habit/'` — matches GitHub Pages path. PWA `start_url`, manifest, and `navigateFallback` all depend on this. **Don't change it without updating the Pages deploy URL.**
-- Android scheme is `https` in `capacitor.config.ts`; `allowMixedContent: false`. WebView loads `dist/` directly (no live reload URL configured).
+- Android scheme is `https` in `capacitor.config.ts`; `allowMixedContent: false`. WebView loads `docs/` directly (no live reload URL configured).
 - WebDAV config is stored in KV under key `webdav.config` (see `src/sync/fullSync.ts`). Default remote dir is `/daily-habit` (constant `DEFAULT_REMOTE_DIR` in `src/db/schema.ts`).
 - Deletion is **soft** (`Project.deleted: 0|1`); sync still uploads deleted projects so other devices see the tombstone.
 - ETag flow: `getDirEntryEtag` is called after every `putFileContents` because the `webdav` lib returns an opaque value, not the real ETag. Don't try to cache it across requests.
 - The merge's "remote" upload uses `contentLength: false` — required for some WebDAV servers; do not "fix" it.
+- Build output is `docs/` (not `dist/`). `VITE_BASE_URL` env var controls the asset base path; defaults to `/daily-habit/` (GitHub Pages). Set to `/` for root deployments (Cloudflare Pages, custom domain).
 - The conflict dialog is mounted globally in `App.tsx`; `resolveConflict` always defaults each item's `resolution` to `'local'` if missing.
 
 ## Deploy
-- Web: push to `main` → `.github/workflows/deploy.yml` (pnpm 9, Node 22) builds and publishes `dist/` to GitHub Pages at `/daily-habit/`. The workflow copies `dist/index.html` to `dist/404.html` for SPA routing — local builds don't need this.
+- Web: push to `main` → `.github/workflows/deploy.yml` (pnpm 9, Node 22) builds and publishes `docs/` to GitHub Pages at `/daily-habit/`. The workflow copies `docs/index.html` to `docs/404.html` for SPA routing — local builds don't need this.
+- Cloudflare Pages: `pnpm build:cf` outputs to `docs/`. Deploy `docs/` via Cloudflare Pages dashboard (or connect repo). `public/_headers` provides COOP/COEP headers; `public/_redirects` handles SPA fallback. Set build command to `pnpm build:cf` and publish directory to `docs`.
 - Android: local-only, no CI.
 
 ## Conventions

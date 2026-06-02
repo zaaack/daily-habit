@@ -3,7 +3,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 const config: CapacitorConfig = {
   appId: 'com.dailyhabit.app',
   appName: 'Daily Habit',
-  webDir: 'dist',
+  webDir: 'docs',
   android: {
     allowMixedContent: false,
   },

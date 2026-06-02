@@ -5,7 +5,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 import sqlocalVitePlugin from 'sqlocal/vite'
 
 export default defineConfig({
-  base: '/daily-habit/',
+  base: process.env.VITE_BASE_URL || '/daily-habit/',
+  build: { outDir: 'docs' },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
