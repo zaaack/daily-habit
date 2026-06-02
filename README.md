@@ -1,73 +1,35 @@
-# React + TypeScript + Vite
+# Daily Habit
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+每日打卡 App · Capacitor + React + TypeScript + Vite + Zustand + Dexie/SQLite + WebDAV 同步
 
-Currently, two official plugins are available:
+## 功能
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- ✅ / ❌ / 留空 三种打卡状态（留空不入库）
+- 数字单位、备注
+- 首页：项目列表 + 最近 N 天打卡状态（3-7 滑块自由选），单元格点击循环、双击/长按弹窗编辑
+- 详情页：月度热力图 + uPlot 折线 + 历史查询
+- WebDAV 同步（启动 + 打卡后触发），每项目一个 JSON，ETag 乐观锁，冲突弹窗
+- 跨平台：Android（Capacitor 6 + Capacitor SQLite）/ Web（PWA，Dexie/IndexedDB）
 
-## React Compiler
+## 开发
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm install
+pnpm dev          # 浏览器预览
+pnpm build        # 打包到 dist
+pnpm preview      # 预览构建
+pnpm android:build  # 打包 APK
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 部署
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- Web：推送到 `main` 触发 `.github/workflows/deploy.yml` 部署到 GitHub Pages（路径 `/daily-habit/`）
+- Android：本地 `pnpm android:build`，输出 `android/app/build/outputs/apk/debug/app-debug.apk`
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 目录约定
+
+- `src/db/` 数据层（Repo 接口 + Dexie/SQLite 双实现）
+- `src/sync/` WebDAV 同步引擎
+- `src/state/` zustand store
+- `src/components/` 通用组件
+- `src/routes/` 路由页面
