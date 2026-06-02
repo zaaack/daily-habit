@@ -12,7 +12,7 @@ export const PROJECT_EMOJIS = [
   '☕', '💤', '🧹', '💪', '🌱', '🚴', '📝', '🧠',
 ]
 
-export const DEFAULT_REMOTE_DIR = '/dailies'
+export const DEFAULT_REMOTE_DIR = '/daily-habit'
 
 export function makeRemotePath(id: string, dir: string = DEFAULT_REMOTE_DIR): string {
   const d = dir.endsWith('/') ? dir.slice(0, -1) : dir

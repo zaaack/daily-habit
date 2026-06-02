@@ -30,6 +30,6 @@ function sameCfg(a: WebDavConfig, b: WebDavConfig) {
 }
 
 export function normalizeDir(dir: string): string {
-  if (!dir) return '/dailies'
+  if (!dir) return '/daily-habit'
   return dir.startsWith('/') ? dir : `/${dir}`
 }
