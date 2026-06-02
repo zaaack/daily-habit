@@ -1,4 +1,4 @@
-export type CheckStatus = 'success' | 'fail'
+export type CheckStatus = 'success' | 'fail' | 'deleted'
 
 export interface Project {
   id: string

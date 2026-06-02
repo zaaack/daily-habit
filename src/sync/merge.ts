@@ -1,6 +1,6 @@
 import type { Project, Checkin, CheckStatus, ConflictItem } from '@/db/types'
 
-export interface CompactCheckin { d: number; s: 0 | 1; v: number | null; n: string | null; u: number }
+export interface CompactCheckin { d: number; s: 0 | 1 | -1; v: number | null; n: string | null; u: number }
 
 export interface ProjectFile {
   version: 2
@@ -33,7 +33,7 @@ export function epochDayToDateStr(epochDay: number): string {
 export function checkinToCompact(c: Checkin): CompactCheckin {
   return {
     d: dateStrToEpochDay(c.date),
-    s: c.status === 'success' ? 1 : 0,
+    s: c.status === 'deleted' ? -1 : c.status === 'success' ? 1 : 0,
     v: c.value,
     n: c.note,
     u: c.updatedAt,
@@ -44,11 +44,15 @@ export function compactToCheckin(projectId: number | string, c: CompactCheckin):
   return {
     projectId: String(projectId),
     date: epochDayToDateStr(c.d),
-    status: c.s === 1 ? 'success' : 'fail',
+    status: c.s === 1 ? 'success' : c.s === -1 ? 'deleted' : 'fail',
     value: c.v,
     note: c.n,
     updatedAt: c.u,
   }
+}
+
+export function isDeletedCheckin(c: Checkin): boolean {
+  return c.status === 'deleted'
 }
 
 type ProjectMeta = Omit<Project, 'remoteEtag' | 'remotePath'>
@@ -139,9 +143,10 @@ export function mergeProjectFile(
   }
 
   merged.sort((a, b) => a.date.localeCompare(b.date))
-  const changed = projectChanged || merged.length !== localCheckins.length
-    || merged.some((c, i) => c.updatedAt !== localCheckins[i]?.updatedAt)
-  return { project, checkins: merged, conflicts, changed }
+  const result = merged.filter(c => c.status !== 'deleted')
+  const changed = projectChanged || result.length !== localCheckins.length
+    || result.some((c, i) => c.updatedAt !== localCheckins[i]?.updatedAt)
+  return { project, checkins: result, conflicts, changed }
 }
 
 function pickField(c: Checkin, f: 'status' | 'value' | 'note'): string | number | null {

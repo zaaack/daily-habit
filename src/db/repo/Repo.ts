@@ -16,9 +16,10 @@ export interface Repo {
   // checkins
   getCheckin(projectId: string, date: string): Promise<Checkin | undefined>
   getCheckins(projectId: string, range?: DateRange): Promise<Checkin[]>
+  getCheckinsAll(projectId: string): Promise<Checkin[]>
   upsertCheckin(c: Checkin): Promise<void>
   bulkUpsertCheckins(checkins: Checkin[]): Promise<void>
-  deleteCheckin(projectId: string, date: string): Promise<void>
+  deleteCheckin(projectId: string, date: string, updatedAt?: number): Promise<void>
   // kv
   getKV<T = unknown>(key: string): Promise<T | null>
   setKV(key: string, value: unknown): Promise<void>

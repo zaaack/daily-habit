@@ -139,7 +139,7 @@ export abstract class SqliteKyselyRepo implements Repo {
     return {
       projectId: r.project_id,
       date: r.date,
-      status: r.status as 'success' | 'fail',
+      status: r.status as Checkin['status'],
       value: r.value,
       note: r.note,
       updatedAt: r.updated_at,
@@ -208,16 +208,23 @@ export abstract class SqliteKyselyRepo implements Repo {
     const row = await db.selectFrom('checkins').selectAll()
       .where('project_id', '=', projectId)
       .where('date', '=', date)
+      .where('status', '!=', 'deleted')
       .executeTakeFirst()
     return row ? this.rowToCheckin(row) : undefined
   }
 
   async getCheckins(projectId: string, range?: DateRange): Promise<Checkin[]> {
     const db = await this.getDb()
-    let query = db.selectFrom('checkins').selectAll().where('project_id', '=', projectId)
+    let query = db.selectFrom('checkins').selectAll().where('project_id', '=', projectId).where('status', '!=', 'deleted')
     if (range?.from) query = query.where('date', '>=', range.from)
     if (range?.to) query = query.where('date', '<=', range.to)
     const rows = await query.orderBy('date', 'asc').execute()
+    return rows.map(r => this.rowToCheckin(r))
+  }
+
+  async getCheckinsAll(projectId: string): Promise<Checkin[]> {
+    const db = await this.getDb()
+    const rows = await db.selectFrom('checkins').selectAll().where('project_id', '=', projectId).orderBy('date', 'asc').execute()
     return rows.map(r => this.rowToCheckin(r))
   }
 
@@ -263,12 +270,34 @@ export abstract class SqliteKyselyRepo implements Repo {
     }
   }
 
-  async deleteCheckin(projectId: string, date: string): Promise<void> {
+  async deleteCheckin(projectId: string, date: string, updatedAt?: number): Promise<void> {
     const db = await this.getDb()
-    await db.deleteFrom('checkins')
-      .where('project_id', '=', projectId)
-      .where('date', '=', date)
-      .execute()
+    if (updatedAt) {
+      const existing = await db.selectFrom('checkins').selectAll()
+        .where('project_id', '=', projectId)
+        .where('date', '=', date)
+        .executeTakeFirst()
+      const values = {
+        project_id: projectId,
+        date,
+        status: 'deleted',
+        value: existing?.value ?? null,
+        note: existing?.note ?? null,
+        updated_at: updatedAt,
+      }
+      await db.insertInto('checkins')
+        .values(values)
+        .onConflict(cb => cb.columns(['project_id', 'date']).doUpdateSet({
+          status: 'deleted',
+          updated_at: updatedAt,
+        }))
+        .execute()
+    } else {
+      await db.deleteFrom('checkins')
+        .where('project_id', '=', projectId)
+        .where('date', '=', date)
+        .execute()
+    }
   }
 
   async getKV<T = unknown>(key: string): Promise<T | null> {

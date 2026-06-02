@@ -68,14 +68,22 @@ export class DexieRepo implements Repo {
   }
 
   async getCheckin(projectId: string, date: string): Promise<Checkin | undefined> {
-    return this.db.checkins.get([projectId, date])
+    const c = await this.db.checkins.get([projectId, date])
+    return c && c.status !== 'deleted' ? c : undefined
   }
 
   async getCheckins(projectId: string, range?: DateRange): Promise<Checkin[]> {
     let coll = this.db.checkins.where('projectId').equals(projectId)
     let arr = await coll.toArray()
+    arr = arr.filter(c => c.status !== 'deleted')
     if (range?.from) arr = arr.filter(c => c.date >= range.from!)
     if (range?.to) arr = arr.filter(c => c.date <= range.to!)
+    arr.sort((a, b) => a.date.localeCompare(b.date))
+    return arr
+  }
+
+  async getCheckinsAll(projectId: string): Promise<Checkin[]> {
+    const arr = await this.db.checkins.where('projectId').equals(projectId).toArray()
     arr.sort((a, b) => a.date.localeCompare(b.date))
     return arr
   }
@@ -88,8 +96,21 @@ export class DexieRepo implements Repo {
     await this.db.checkins.bulkPut(checkins)
   }
 
-  async deleteCheckin(projectId: string, date: string): Promise<void> {
-    await this.db.checkins.delete([projectId, date])
+  async deleteCheckin(projectId: string, date: string, updatedAt?: number): Promise<void> {
+    if (updatedAt) {
+      const cur = await this.db.checkins.get([projectId, date])
+      const c: Checkin = {
+        projectId,
+        date,
+        status: 'deleted',
+        value: cur?.value ?? null,
+        note: cur?.note ?? null,
+        updatedAt,
+      }
+      await this.db.checkins.put(c)
+    } else {
+      await this.db.checkins.delete([projectId, date])
+    }
   }
 
   async getKV<T = unknown>(key: string): Promise<T | null> {

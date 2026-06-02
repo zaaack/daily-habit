@@ -232,7 +232,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         else if (cur.status === "success") nextStatus = "fail";
         else nextStatus = null;
         if (nextStatus === null) {
-            await repo.deleteCheckin(projectId, date);
+            await repo.deleteCheckin(projectId, date, nowMs());
         } else {
             const c: Checkin = {
                 projectId,
@@ -250,7 +250,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     async setCheckin(projectId, date, status, value, note) {
         const repo = await getRepo();
         if (status === null) {
-            await repo.deleteCheckin(projectId, date);
+            await repo.deleteCheckin(projectId, date, nowMs());
         } else {
             const c: Checkin = {
                 projectId,
@@ -331,12 +331,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         }));
         for (const it of resolvedItems) {
             const cur = await repo.getCheckin(projectId, it.date);
-            if (it.resolution === "local") continue;
+            if (it.resolution === "local") {
+                if (cur) {
+                    await repo.upsertCheckin({ ...cur, updatedAt: nowMs() });
+                }
+                continue;
+            }
             if (it.resolution === "remote") {
                 if (cur) {
                     if (it.field === "status") {
                         if (it.remote === null)
-                            await repo.deleteCheckin(projectId, it.date);
+                            await repo.deleteCheckin(projectId, it.date, nowMs());
                         else
                             await repo.upsertCheckin({
                                 ...cur,
