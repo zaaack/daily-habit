@@ -119,6 +119,7 @@ jobs:
         run: pnpm electron:build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: Upload artifacts to Release
         uses: actions/github-script@v7

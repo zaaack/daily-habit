@@ -1,5 +1,6 @@
 appId: com.daily-habit.app
 productName: Daily Habit
+sign: false
 directories:
   output: release
 files:
