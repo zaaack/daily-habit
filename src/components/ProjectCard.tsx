@@ -5,8 +5,8 @@ import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/state/useAppStore";
 import { getRepo } from "@/db";
 import { StatusCell } from "./StatusCell";
-import type { Project, Checkin, CheckStatus } from "@/db/types";
-import { todayStr, nowMs } from "@/db/schema";
+import type { Project, Checkin } from "@/db/types";
+import { todayStr } from "@/db/schema";
 import { cn } from "@/lib/cn";
 
 export function ProjectCard({

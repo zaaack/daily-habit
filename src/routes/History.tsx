@@ -10,6 +10,7 @@ import { format } from 'date-fns'
 export function History() {
   const { t } = useTranslation()
   const projects = useAppStore(s => s.projects)
+  const checkinVersion = useAppStore(s => s.checkinVersion)
   const [params, setParams] = useSearchParams()
   const filterProject = params.get('project') ?? ''
   const [statusFilter, setStatusFilter] = useState<'all' | CheckStatus>('all')
@@ -30,9 +31,8 @@ export function History() {
       if (alive) setAllCheckins(out.sort((a, b) => b.date.localeCompare(a.date)))
     }
     void load()
-    const t = setInterval(() => { void load() }, 2000)
-    return () => { alive = false; clearInterval(t) }
-  }, [projects])
+    return () => { alive = false }
+  }, [projects, checkinVersion])
 
   const projectById = useMemo(() => new Map(projects.map(p => [p.id, p])), [projects])
 

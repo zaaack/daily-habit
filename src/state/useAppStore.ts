@@ -33,6 +33,7 @@ interface AppState {
     sync: SyncState;
     conflicts: Record<string, ConflictItem[]>;
     filterState: FilterState;
+    checkinVersion: number;
 
     init(): Promise<void>;
 
@@ -78,6 +79,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     sync: { status: "idle", at: null, error: null, pending: 0 },
     conflicts: {},
     filterState: { normal: true, archived: false, deleted: false },
+    checkinVersion: 0,
 
     async init() {
         const timeout = new Promise<never>((_, reject) =>
@@ -249,6 +251,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             await repo.upsertCheckin(c);
         }
         void syncOneProject(projectId).catch(() => {});
+        set((s) => ({ checkinVersion: s.checkinVersion + 1 }));
     },
 
     async setCheckin(projectId, date, status, value, note) {
@@ -267,6 +270,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             await repo.upsertCheckin(c);
         }
         void syncOneProject(projectId).catch(() => {});
+        set((s) => ({ checkinVersion: s.checkinVersion + 1 }));
     },
 
     async triggerSync() {
@@ -286,7 +290,7 @@ export const useAppStore = create<AppState>((set, get) => ({
                     }));
                 },
                 onProjectsChange: (projects) => {
-                    set({ projects: sortProjects(projects) });
+                    set({ projects: sortProjects(projects), checkinVersion: get().checkinVersion + 1 });
                 },
             });
             const at = nowMs();
@@ -391,6 +395,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             return { conflicts: c };
         });
         void get().triggerSync();
+        set((s) => ({ checkinVersion: s.checkinVersion + 1 }));
     },
 
     async clearConflict(projectId) {
