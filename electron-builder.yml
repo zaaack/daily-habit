@@ -2,6 +2,9 @@ appId: com.daily-habit.app
 productName: Daily Habit
 directories:
     output: release
+publish:
+    provider: github
+    releaseType: draft
 files:
     - electron/main.cjs
     - electron/preload.cjs

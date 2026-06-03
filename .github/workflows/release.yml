@@ -6,11 +6,6 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
-      targets:
-        description: 'Electron 构建目标（逗号分隔，如 linux,macos,windows）留空则构建全部'
-        required: false
-        default: 'linux,macos,windows'
-        type: string
       skip-android:
         description: '跳过 Android APK 构建'
         required: false
@@ -25,69 +20,47 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── Create Release ──────────────────────────────────────────────────
-  create-release:
-    runs-on: ubuntu-latest
-    outputs:
-      release_id: ${{ steps.create-release.outputs.result }}
+  # ── Build Desktop (Linux / macOS / Windows) ────────────────────────
+  # electron-builder --publish always 自动创建 release 并上传
+  build-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-latest
+            os: linux
+          - platform: macos-latest
+            os: macos
+          - platform: windows-latest
+            os: windows
+
+    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Get version
-        id: get-version
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION="${GITHUB_REF#refs/tags/v}"
-          else
-            VERSION=$(node -p "require('./package.json').version")
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Create release
-        id: create-release
-        uses: actions/github-script@v7
+      - uses: pnpm/action-setup@v4
         with:
-          script: |
-            const tag = `v${process.env.VERSION}`;
-            try {
-              const { data: existing } = await github.rest.repos.getReleaseByTag({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                tag,
-              });
-              console.log(`Reusing existing release ${existing.id} for tag ${tag}`);
-              return existing.id;
-            } catch (e) {
-              if (e.status !== 404) throw e;
-            }
-            try {
-              const { data } = await github.rest.repos.createRelease({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                tag_name: tag,
-                name: `Daily Habit v${process.env.VERSION}`,
-                body: 'Take a look at the assets to download and install this app.',
-                draft: true,
-                prerelease: false
-              })
-              return data.id
-            } catch (e) {
-              if (e.status === 422 && e.message?.includes('tag_name')) {
-                const { data: existing } = await github.rest.repos.getReleaseByTag({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  tag,
-                });
-                return existing.id;
-              }
-              throw e;
-            }
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: ELECTRON=1 pnpm build
+
+      - name: Build and Publish
+        run: npx electron-builder --publish always
         env:
-          VERSION: ${{ steps.get-version.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
   # ── Build Android APK ──────────────────────────────────────────────
   build-android:
-    needs: create-release
     if: |
       (github.event_name == 'push') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.skip-android != 'true')
@@ -135,96 +108,47 @@ jobs:
           name: android
           path: android/app/build/outputs/apk/debug/*.apk
 
-  # ── Build Desktop (Linux / macOS / Windows) ────────────────────────
-  build-desktop:
-    needs: create-release
-    if: github.event_name == 'push' || github.event.inputs.targets != ''
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: ubuntu-latest
-            os: linux
-          - platform: macos-latest
-            os: macos
-          - platform: windows-latest
-            os: windows
-
-    runs-on: ${{ matrix.platform }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install JS dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build frontend
-        run: pnpm electron:build
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: desktop-${{ matrix.os }}
-          path: |
-            release/*.exe
-            release/*.dmg
-            release/*.zip
-            release/*.AppImage
-            release/*.deb
-
-  # ── Publish Release ────────────────────────────────────────────────
-  publish-release:
-    needs: [create-release, build-android, build-desktop]
-    if: always() && needs.create-release.result == 'success'
+  # ── Upload Android APK to Release ──────────────────────────────────
+  upload-android:
+    needs: [build-desktop, build-android]
+    if: always() && needs.build-android.result == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Download all artifacts
+      - name: Download Android artifact
         uses: actions/download-artifact@v4
         with:
+          name: android
           path: artifacts
-          merge-multiple: true
 
-      - name: Upload assets to release
+      - name: Upload APK to Release
         uses: actions/github-script@v7
-        env:
-          release_id: ${{ needs.create-release.outputs.release_id }}
         with:
           script: |
             const fs = require('fs');
             const path = require('path');
+            const tag = context.ref.replace('refs/tags/', '');
+
+            // Get release by tag (created by electron-builder)
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag,
+            });
 
             // Get existing assets to avoid duplicates
             const { data: existingAssets } = await github.rest.repos.listReleaseAssets({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              release_id: parseInt(process.env.release_id),
+              release_id: release.id,
             });
             const existingNames = new Set(existingAssets.map(asset => asset.name));
 
             const dir = 'artifacts';
-            if (!fs.existsSync(dir)) {
-              console.log('No artifacts found');
-              return;
-            }
-
             for (const file of fs.readdirSync(dir)) {
-              const name = path.basename(file);
-              // Skip latest.yml (electron-builder auto-update metadata)
-              if (name === 'latest.yml' || name === 'latest.yaml') continue;
+              if (!file.endsWith('.apk')) continue;
               
-              if (existingNames.has(name)) {
-                console.log(`Skipping existing asset: ${name}`);
+              if (existingNames.has(file)) {
+                console.log(`Skipping existing asset: ${file}`);
                 continue;
               }
               
@@ -232,39 +156,48 @@ jobs:
               await github.rest.repos.uploadReleaseAsset({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                release_id: parseInt(process.env.release_id),
-                name,
+                release_id: release.id,
+                name: file,
                 data,
               });
-              console.log(`Uploaded: ${name}`);
+              console.log(`Uploaded: ${file}`);
             }
 
+  # ── Publish Release ────────────────────────────────────────────────
+  publish-release:
+    needs: [build-desktop, build-android]
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
       - name: Publish release
         uses: actions/github-script@v7
-        env:
-          release_id: ${{ needs.create-release.outputs.release_id }}
-          android_result: ${{ needs.build-android.result }}
-          desktop_result: ${{ needs.build-desktop.result }}
         with:
           script: |
-            const success = ['success', 'skipped'];
-            if (!success.includes(process.env.android_result) || !success.includes(process.env.desktop_result)) {
-              core.setFailed('Build job failed or was cancelled.');
-              return;
-            }
-            const { data: release } = await github.rest.repos.getRelease({
+            const tag = context.ref.replace('refs/tags/', '');
+            const { data: release } = await github.rest.repos.getReleaseByTag({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              release_id: parseInt(process.env.release_id),
+              tag,
             });
+
             if (!release.draft) {
               console.log('Release is already published, skipping.');
               return;
             }
+
+            const success = ['success', 'skipped'];
+            const androidOk = success.includes('${{ needs.build-android.result }}');
+            const desktopOk = success.includes('${{ needs.build-desktop.result }}');
+            
+            if (!androidOk || !desktopOk) {
+              core.setFailed('Build job failed or was cancelled.');
+              return;
+            }
+
             await github.rest.repos.updateRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              release_id: parseInt(process.env.release_id),
+              release_id: release.id,
               draft: false,
               prerelease: false
             });
