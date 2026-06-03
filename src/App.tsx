@@ -65,30 +65,16 @@ export function App() {
         return () => mq.removeEventListener("change", onChange);
     }, []);
 
-    // F12: open DevTools in Tauri packaged builds
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (e.key === "F12") {
                 e.preventDefault();
-                tryOpenDevTools();
+                (window as any).electronAPI?.toggleDevTools();
             }
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
     }, []);
-
-    async function tryOpenDevTools() {
-        try {
-            const { getCurrentWebview } =
-                await import("@tauri-apps/api/webview");
-            const wv = getCurrentWebview();
-            if ("openDevtools" in wv) {
-                await (wv as any).openDevtools();
-            }
-        } catch {
-            // not in Tauri or API unavailable
-        }
-    }
 
     if (!ready) {
         return (

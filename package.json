@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "preversion": "pnpm build",
     "dev": "vite",
@@ -14,15 +15,14 @@
     "cap:sync": "cap sync android",
     "cap:open:android": "cap open android",
     "android:build": "VITE_BASE_URL=/ pnpm build && cap sync android && cd android && ./gradlew assembleDebug",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
-    "tauri:android:init": "tauri android init",
-    "tauri:android:dev": "tauri android dev",
-    "tauri:android:build": "tauri android build"
+    "electron:dev": "ELECTRON=1 pnpm build && electron .",
+    "electron:build": "ELECTRON=1 pnpm build && electron-builder"
   },
   "dependencies": {
-    "@capacitor-community/sqlite": "^6.0.2",
+   
+  },
+  "devDependencies": {
+       "@capacitor-community/sqlite": "^6.0.2",
     "@capacitor/android": "^6.2.0",
     "@capacitor/core": "^6.2.0",
     "@dnd-kit/core": "^6.3.1",
@@ -49,14 +49,8 @@
     "tailwind-merge": "^2.6.0",
     "webdav": "^5.8.0",
     "zod": "^3.24.1",
-    "zustand": "^5.0.2"
-  },
-  "devDependencies": {
+    "zustand": "^5.0.2",
     "@capacitor/cli": "^6.2.0",
-    "@tauri-apps/api": "^2.11.0",
-    "@tauri-apps/cli": "^2.11.2",
-    "@tauri-apps/plugin-http": "^2.5.9",
-    "@tauri-apps/plugin-sql": "^2.4.0",
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
@@ -72,6 +66,8 @@
     "vite": "^6.0.7",
     "vite-plugin-pwa": "^0.21.1",
     "workbox-window": "^7.3.0",
-    "wrangler": "^4.96.0"
+    "wrangler": "^4.96.0",
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.0"
   }
 }

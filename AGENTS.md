@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## Project
-每日打卡 PWA + Android + Desktop app. **Tauri 2** + **Capacitor 6** + **React 19** + **TypeScript** + **Vite 6** + **Zustand** + **Dexie (web) / Capacitor SQLite (Android) / Tauri SQLite (Desktop)** + **WebDAV** sync. Each project is one JSON file on the remote, synced via ETag optimistic locking with field-level LWW merge and a conflict dialog.
+每日打卡 PWA + Android + Desktop app. **Capacitor 6** + **Electron** + **React 19** + **TypeScript** + **Vite 6** + **Zustand** + **Dexie (web) / Capacitor SQLite (Android) / OPFS SQLite (Desktop)** + **WebDAV** sync. Each project is one JSON file on the remote, synced via ETag optimistic locking with field-level LWW merge and a conflict dialog.
 
 ## Commands
 - `pnpm dev` — Vite dev (browser only, runs against Dexie)
@@ -10,27 +10,28 @@
 - `pnpm lint` — ESLint, flat config. Only `**/*.{ts,tsx}`; ignores `docs`, `node_modules`, `android`, `.capacitor`, `*.config.js`, `*.config.ts`. `no-unused-vars` is off; `tsc` enforces unused locals/params.
 - `pnpm android:build` — `pnpm build && cap sync android && cd android && ./gradlew assembleDebug`. APK lands at `android/app/build/outputs/apk/debug/app-debug.apk`. Needs local JDK + Android SDK (not in CI).
 - `pnpm cap:sync` / `pnpm cap:open:android` — Capacitor CLI helpers.
-- `pnpm tauri:dev` — Tauri dev mode (runs `tauri dev`, launches desktop window with hot reload).
-- `pnpm tauri:build` — Builds frontend (`pnpm build`) then packages desktop app via `tauri build`. Output: `src-tauri/target/release/bundle/`.
-- `pnpm tauri:android:init` — One-time Tauri Android project init (generates `src-tauri/gen/android/`).
-- `pnpm tauri:android:dev` — Run Tauri Android app on connected device/emulator.
-- `pnpm tauri:android:build` — Build Tauri Android APK/AAB. Needs Android SDK + NDK (set via `ANDROID_HOME` / `ANDROID_NDK_HOME`). Output: `src-tauri/gen/android/app/build/outputs/apk/`.
+- `pnpm electron:dev` — Builds frontend then launches Electron in dev mode with hot reload.
+- `pnpm electron:build` — Builds frontend then packages desktop app via `electron-builder`. Output: `release/`.
 
 No tests, no Husky, no commitlint.
 
 ## Layout (real entrypoints)
-- `src/main.tsx` → `src/App.tsx` — uses `createMemoryRouter` (NOT `BrowserRouter`; intentional for Android/PWA). `App` calls `useAppStore.init()` once and shows `ConflictDialog` at the root.
+- `src/main.tsx` → `src/App.tsx` — uses `createHashRouter` (NOT `BrowserRouter`; intentional for Android/PWA). `App` calls `useAppStore.init()` once and shows `ConflictDialog` at the root.
 - `src/state/useAppStore.ts` — single zustand store. **All data mutations go through here** (addProject, updateProject, deleteProject, cycleCheckin, setCheckin, triggerSync, resolveConflict). Every mutation fires `syncOneProject(...)` or `triggerSync()` as fire-and-forget; sync errors set `sync.status='error'`.
-- `src/db/` — `Repo` interface + `DexieRepo` (web fallback) + `SqlocalRepo` (web primary, OPFS SQLite) + `SqliteRepo` (Android Capacitor SQLite) + `TauriRepo` (desktop Tauri SQLite via plugin-sql). `getRepo()` is a module-level singleton, picks implementation via `isAndroid` / `isTauri` from `src/lib/platform.ts`. New persistence code must implement `Repo`; don't bypass it.
+- `src/db/` — `Repo` interface + `DexieRepo` (web fallback) + `SqlocalRepo` (web/primary, OPFS SQLite) + `SqliteRepo` (Android Capacitor SQLite). `getRepo()` is a module-level singleton, picks implementation via `isAndroid` from `src/lib/platform.ts`. New persistence code must implement `Repo`; don't bypass it.
 - `src/sync/fullSync.ts` — full sync loop + `syncOneProject`. `mergeProjectFile` (in `src/sync/merge.ts`) is field-level LWW by `updatedAt`; ties with differing fields become `ConflictItem`s and surface via `useAppStore.conflicts`.
 - `src/components/`, `src/routes/` — UI; `ProjectCard` polls checkins every 2s.
-- `scripts/generate-icons.mjs` — uses `sharp` to render PNG icons from `public/favicon.svg` into `public/`.
+- `scripts/generate-icons.mjs` — uses `sharp` to render PNG icons from `public/favicon.svg` into `public/` (web) and `build/` (Electron desktop).
+- `electron/main.js` — Electron main process. Creates `BrowserWindow`, loads `docs/index.html` (production) or `localhost:5173` (dev). Exposes DevTools toggle via IPC.
+- `electron/preload.js` — Exposes `electronAPI.toggleDevTools()` to renderer.
+- `electron-builder.yml` — electron-builder config. Targets: macOS (dmg/zip), Windows (nsis/portable), Linux (AppImage/deb).
 
 Path alias: `@/*` → `src/*` (set in both `tsconfig.json` and `vite.config.ts`).
 
 ## Quirks
-- `vite.config.ts` has `base: '/daily-habit/'` by default — matches GitHub Pages path. PWA `start_url`, manifest, and `navigateFallback` all depend on this. **Don't change it without updating the Pages deploy URL.** In Tauri mode (`TAURI_ENV_PLATFORM` env set), base is forced to `/` and PWA is disabled.
+- `vite.config.ts` has `base: '/daily-habit/'` by default — matches GitHub Pages path. PWA `start_url`, manifest, and `navigateFallback` all depend on this. **Don't change it without updating the Pages deploy URL.** In Electron mode (`ELECTRON=1` env set), base is forced to `/` and PWA is disabled.
 - Android scheme is `https` in `capacitor.config.ts`; `allowMixedContent: false`. WebView loads `docs/` directly (no live reload URL configured).
+- Electron uses `webSecurity: false` in `BrowserWindow` to bypass CORS for WebDAV sync. In dev mode, it loads from `localhost:5173`; in production, from `docs/index.html`.
 - WebDAV config is stored in KV under key `webdav.config` (see `src/sync/fullSync.ts`). Default remote dir is `/daily-habit` (constant `DEFAULT_REMOTE_DIR` in `src/db/schema.ts`).
 - Deletion is **soft** (`Project.deleted: 0|1`); sync still uploads deleted projects so other devices see the tombstone.
 - ETag flow: `getDirEntryEtag` is called after every `putFileContents` because the `webdav` lib returns an opaque value, not the real ETag. Don't try to cache it across requests.
@@ -42,11 +43,11 @@ Path alias: `@/*` → `src/*` (set in both `tsconfig.json` and `vite.config.ts`)
 - Web: push to `main` → `.github/workflows/deploy.yml` (pnpm 9, Node 22) builds and publishes `docs/` to GitHub Pages at `/daily-habit/`. The workflow copies `docs/index.html` to `docs/404.html` for SPA routing — local builds don't need this.
 - Cloudflare Workers: `pnpm build:cf && npx wrangler deploy` deploys `docs/` via Cloudflare Workers + Assets. `wrangler.jsonc` sets `not_found_handling: "single-page-application"` for SPA fallback. `public/_headers` provides COOP/COEP headers (native Workers support).
 - Android: local-only, no CI.
-- Desktop (Tauri): `pnpm tauri:build` builds for the current platform. Needs Rust toolchain.
+- Desktop (Electron): `pnpm electron:build` builds for the current platform. Output in `release/`. CI builds all platforms via `.github/workflows/release-electron.yml`.
 
 ## Conventions
 - Tailwind utility classes; `cn()` helper in `src/lib/cn.ts`. Brand colors in `tailwind.config.js`.
-- React 19 + react-router-dom v6 (memory router).
+- React 19 + react-router-dom v6 (hash router).
 - Strict TS, `verbatimModuleSyntax`, `noUnusedLocals`/`noUnusedParameters` enforced — clean up imports.
 - KV is JSON-stringified; do not store non-serializable values.
 - Comments in source are sparse by design; don't add them unless asked.

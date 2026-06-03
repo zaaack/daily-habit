@@ -62,28 +62,14 @@ for (const { dir, size } of densities) {
   console.log('wrote', `${dir}/ic_launcher_foreground.png`, fg.length, 'bytes')
 }
 
-// ── Tauri desktop icons ──
-const tauriIconDir = join(__dirname, '..', 'src-tauri', 'icons')
-if (!existsSync(tauriIconDir)) mkdirSync(tauriIconDir, { recursive: true })
+// ── Electron desktop icons ──
+const electronIconDir = join(__dirname, '..', 'build')
+if (!existsSync(electronIconDir)) mkdirSync(electronIconDir, { recursive: true })
 
-// Generate PNG icons for Tauri
-const tauriPngSizes = [32, 128, 256]
-for (const size of tauriPngSizes) {
-  const name = size === 128 ? '128x128.png' : `${size}x${size}.png`
-  const buf = await sharp(svg).resize(size, size).png().toBuffer()
-  writeFileSync(join(tauriIconDir, name), buf)
-  console.log('wrote', `src-tauri/icons/${name}`, buf.length, 'bytes')
-}
-
-// 128x128@2x = 256x256
-const buf128x2 = await sharp(svg).resize(256, 256).png().toBuffer()
-writeFileSync(join(tauriIconDir, '128x128@2x.png'), buf128x2)
-console.log('wrote', 'src-tauri/icons/128x128@2x.png', buf128x2.length, 'bytes')
-
-// icon.png (used as fallback on some platforms)
-const iconPng = await sharp(svg).resize(512, 512).png().toBuffer()
-writeFileSync(join(tauriIconDir, 'icon.png'), iconPng)
-console.log('wrote', 'src-tauri/icons/icon.png', iconPng.length, 'bytes')
+// Electron uses icon.png (512x512) for all platforms
+const electronIconPng = await sharp(svg).resize(512, 512).png().toBuffer()
+writeFileSync(join(electronIconDir, 'icon.png'), electronIconPng)
+console.log('wrote', 'build/icon.png', electronIconPng.length, 'bytes')
 
 // ── Generate valid icon.ico (Windows) ──
 // ICO format wraps PNG images in a simple container header.
@@ -130,18 +116,17 @@ function createIco(pngBuffers) {
 }
 
 // Generate ICO with multiple sizes for best compatibility
-const icoSizes = [32, 64, 128, 256]
+const icoSizes = [16, 32, 48, 64, 128, 256]
 const icoPngs = await Promise.all(
   icoSizes.map((size) => sharp(svg).resize(size, size).png().toBuffer())
 )
 const ico = createIco(icoPngs)
-writeFileSync(join(tauriIconDir, 'icon.ico'), ico)
-console.log('wrote', 'src-tauri/icons/icon.ico', ico.length, 'bytes')
+writeFileSync(join(electronIconDir, 'icon.ico'), ico)
+console.log('wrote', 'build/icon.ico', ico.length, 'bytes')
 
 // ── Generate icon.icns (macOS) ──
 // icns format: header + icon entries containing raw PNG data for each resolution.
 function createIcns(pngEntries) {
-  // Each pngEntry: { type: 'ic07'|'ic08'|..., data: Buffer }
   const entryOverhead = 8  // type(4) + size(4)
   const contentSize = pngEntries.reduce((sum, e) => sum + entryOverhead + e.data.length, 0)
   const totalSize = 8 + contentSize  // magic(4) + totalSize(4) + entries
@@ -171,5 +156,5 @@ const icnsPngs = await Promise.all(
   )
 )
 const icns = createIcns(icnsPngs)
-writeFileSync(join(tauriIconDir, 'icon.icns'), icns)
-console.log('wrote', 'src-tauri/icons/icon.icns', icns.length, 'bytes')
+writeFileSync(join(electronIconDir, 'icon.icns'), icns)
+console.log('wrote', 'build/icon.icns', icns.length, 'bytes')

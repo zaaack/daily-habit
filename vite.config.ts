@@ -2,16 +2,17 @@ import path from 'node:path'
 import { defineConfig, type PluginOption } from 'vite'
 import react from '@vitejs/plugin-react'
 
-const isTauri = process.env.TAURI_ENV_PLATFORM !== undefined
-const base = isTauri ? '/' : (process.env.VITE_BASE_URL || '/daily-habit/')
+const isElectron = process.env.ELECTRON === '1'
+const base = isElectron ? '/' : (process.env.VITE_BASE_URL || '/daily-habit/')
 
 async function createPlugins(): Promise<PluginOption[]> {
   const plugins: PluginOption[] = [react()]
 
-  if (!isTauri) {
-    const { default: sqlocalVitePlugin } = await import('sqlocal/vite')
+const { default: sqlocalVitePlugin } = await import('sqlocal/vite')
+plugins.push(sqlocalVitePlugin({ coi: true }))
+    
+  if (!isElectron) {
     const { VitePWA } = await import('vite-plugin-pwa')
-    plugins.push(sqlocalVitePlugin({ coi: true }))
     plugins.push(
       VitePWA({
         registerType: 'autoUpdate',
@@ -45,16 +46,14 @@ export default defineConfig({
   base,
   build: {
     outDir: 'docs',
-    ...(isTauri ? { rollupOptions: { external: [/^sqlocal/] } } : {}),
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
-  server: isTauri
-    ? { port: 5173, strictPort: true }
-    : {
+  server: {
+        port: 5173, strictPort: isElectron,
         headers: {
           'Cross-Origin-Embedder-Policy': 'require-corp',
           'Cross-Origin-Opener-Policy': 'same-origin',

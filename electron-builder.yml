@@ -1,0 +1,45 @@
+appId: com.daily-habit.app
+productName: Daily Habit
+directories:
+  output: release
+files:
+  - electron/main.cjs
+  - electron/preload.cjs
+  - "docs/**/*"
+  - package.json
+  - "!src/**"
+  - "!src-tauri/**"
+  - "!android/**"
+  - "!.github/**"
+  - "!node_modules/**"
+  - "!scripts/**"
+  - "!*.config.*"
+  - "!tsconfig*"
+  - "!eslint*"
+  - "!tailwind*"
+  - "!postcss*"
+  - "!pnpm-lock.yaml"
+  - "!wrangler*"
+  - "!AGENTS.md"
+  - "!README.md"
+  - "!.env*"
+mac:
+  category: public.app-category.lifestyle
+  icon: build/icon.icns
+  target:
+    - dmg
+    - zip
+win:
+  icon: build/icon.ico
+  target:
+    - nsis
+    - portable
+linux:
+  icon: build/icon.png
+  category: Utility
+  target:
+    - AppImage
+    - deb
+    
+electronDownload:
+  mirror: https://npmmirror.com/mirrors/electron/

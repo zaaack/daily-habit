@@ -1,4 +1,4 @@
-name: Build and Release Tauri Apps
+name: Build and Release Electron Apps
 
 'on':
   push:
@@ -7,16 +7,16 @@ name: Build and Release Tauri Apps
   workflow_dispatch:
     inputs:
       targets:
-        description: '要构建的目标（逗号分隔，如 android,linux,macos,windows）留空则构建全部'
+        description: '要构建的目标（逗号分隔，如 linux,macos,windows）留空则构建全部'
         required: false
-        default: 'android,linux,macos,windows'
+        default: 'linux,macos,windows'
         type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: tauri-release
+  group: electron-release
   cancel-in-progress: true
 
 jobs:
@@ -48,7 +48,6 @@ jobs:
         with:
           script: |
             const tag = `v${process.env.VERSION}`;
-            // Check if a release already exists for this tag
             try {
               const { data: existing } = await github.rest.repos.getReleaseByTag({
                 owner: context.repo.owner,
@@ -60,7 +59,6 @@ jobs:
             } catch (e) {
               if (e.status !== 404) throw e;
             }
-            // Tag may exist without a release (e.g. manual tag or prior run failed)
             try {
               const { data } = await github.rest.repos.createRelease({
                 owner: context.repo.owner,
@@ -79,109 +77,12 @@ jobs:
                   repo: context.repo.repo,
                   tag,
                 });
-                console.log(`Tag ${tag} exists without release, reusing release ${existing.id}`);
                 return existing.id;
               }
               throw e;
             }
         env:
           VERSION: ${{ steps.get-version.outputs.version }}
-
-  # ── Android (ARM only, APK + AAB) ──────────────────────────────────
-  build-android:
-    needs: create-release
-    if: github.event_name == 'push' || contains(github.event.inputs.targets || '', 'android')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install JS dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential curl wget file libssl-dev libgtk-3-dev \
-            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android,armv7-linux-androideabi
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: './src-tauri -> target'
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - uses: android-actions/setup-android@v3
-
-      - name: Install NDK
-        run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
-          NDK_DIR=$(ls -d "$ANDROID_HOME/ndk"/*/ 2>/dev/null | head -1)
-          if [ -z "$NDK_DIR" ]; then
-            echo "No NDK found, installing latest..."
-            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk" > /dev/null 2>&1 || true
-            NDK_DIR=$(ls -d "$ANDROID_HOME/ndk"/*/ 2>/dev/null | head -1)
-          fi
-          if [ -n "$NDK_DIR" ]; then
-            echo "ANDROID_NDK_HOME=${NDK_DIR%/}" >> "$GITHUB_ENV"
-          fi
-
-      - name: Build Android (ARM APK)
-        run: pnpm tauri android build --debug
-
-      - name: Upload artifacts to Release
-        uses: actions/github-script@v7
-        env:
-          release_id: ${{ needs.create-release.outputs.release_id }}
-        with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-
-            const dirs = [
-              'src-tauri/gen/android/app/build/outputs/apk/universal/debug',
-              'src-tauri/gen/android/app/build/outputs/bundle/universalDebug',
-            ];
-            const files = [];
-
-            function walkDir(dir) {
-              if (!fs.existsSync(dir)) return;
-              for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-                const full = path.join(dir, entry.name);
-                if (entry.isDirectory()) walkDir(full);
-                else if (entry.name.endsWith('.apk') || entry.name.endsWith('.aab')) files.push(full);
-              }
-            }
-            for (const dir of dirs) walkDir(dir);
-
-            for (const file of files) {
-              const data = fs.readFileSync(file);
-              const newName = path.basename(file).replace(/\.apk$/, '-tauri.apk').replace(/\.aab$/, '-tauri.aab');
-              await github.rest.repos.uploadReleaseAsset({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                release_id: parseInt(process.env.release_id),
-                name: newName,
-                data,
-              });
-              console.log(`Uploaded: ${file} as ${newName}`);
-            }
 
   # ── Desktop (Linux / macOS / Windows) ───────────────────────────────
   build-desktop:
@@ -192,11 +93,11 @@ jobs:
       matrix:
         include:
           - platform: ubuntu-latest
-            args: ''
+            os: linux
           - platform: macos-latest
-            args: '--target aarch64-apple-darwin'
+            os: macos
           - platform: windows-latest
-            args: ''
+            os: windows
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -214,29 +115,56 @@ jobs:
       - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install system dependencies (ubuntu only)
-        if: startsWith(matrix.platform, 'ubuntu')
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
-
-      - name: Build and upload to Release
-        uses: tauri-apps/tauri-action@v0.6
+      - name: Build frontend
+        run: pnpm electron:build
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts to Release
+        uses: actions/github-script@v7
+        env:
+          release_id: ${{ needs.create-release.outputs.release_id }}
         with:
-          projectRoot: ${{ github.workspace }}
-          releaseId: ${{ needs.create-release.outputs.release_id }}
-          args: ${{ matrix.args }}
-          uploadUpdaterSignatures: false
-          uploadUpdaterJson: false
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const releaseDir = 'release';
+            const files = [];
+
+            function walkDir(dir) {
+              if (!fs.existsSync(dir)) return;
+              for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) walkDir(full);
+                else if (entry.name.endsWith('.exe') || entry.name.endsWith('.dmg') ||
+                         entry.name.endsWith('.zip') || entry.name.endsWith('.AppImage') ||
+                         entry.name.endsWith('.deb') || entry.name.endsWith('.yml') ||
+                         entry.name.endsWith('.yaml')) {
+                  files.push(full);
+                }
+              }
+            }
+            walkDir(releaseDir);
+
+            for (const file of files) {
+              const data = fs.readFileSync(file);
+              const name = path.basename(file);
+              // Skip latest.yml (electron-builder auto-update metadata)
+              if (name === 'latest.yml' || name === 'latest.yaml') continue;
+              await github.rest.repos.uploadReleaseAsset({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: parseInt(process.env.release_id),
+                name,
+                data,
+              });
+              console.log(`Uploaded: ${name}`);
+            }
 
   # ── Publish Release ────────────────────────────────────────────────
   publish-release:
-    needs: [create-release, build-desktop, build-android]
+    needs: [create-release, build-desktop]
     if: always() && needs.create-release.result == 'success'
     runs-on: ubuntu-latest
     steps:
@@ -245,12 +173,11 @@ jobs:
         env:
           release_id: ${{ needs.create-release.outputs.release_id }}
           desktop_result: ${{ needs.build-desktop.result }}
-          android_result: ${{ needs.build-android.result }}
         with:
           script: |
             const success = ['success', 'skipped'];
-            if (!success.includes(process.env.desktop_result) && !success.includes(process.env.android_result)) {
-              core.setFailed('All build jobs failed or were cancelled.');
+            if (!success.includes(process.env.desktop_result)) {
+              core.setFailed('Build job failed or was cancelled.');
               return;
             }
             const { data: release } = await github.rest.repos.getRelease({
