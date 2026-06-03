@@ -1,6 +1,7 @@
 {
   "name": "daily-habit",
   "private": true,
+  "author": "Daily Habit <noreply@daily-habit.app>",
   "version": "0.1.0",
   "type": "module",
   "main": "electron/main.cjs",
