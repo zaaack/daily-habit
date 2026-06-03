@@ -1,7 +1,14 @@
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain, protocol, net } = require('electron')
 const path = require('node:path')
 
 const isDev = !app.isPackaged
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'app',
+    privileges: { standard: true, secure: true, supportFetchAPI: true },
+  },
+])
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -22,11 +29,29 @@ function createWindow() {
     win.loadURL('http://localhost:5173')
     win.webContents.openDevTools()
   } else {
-    win.loadFile(path.join(__dirname, 'docs', 'index.html'))
+    win.loadURL('app://index.html')
   }
 }
 
 app.whenReady().then(() => {
+  if (!isDev) {
+    protocol.handle('app', (request) => {
+      const url = new URL(request.url)
+      const filePath = url.pathname === '/' ? '/index.html' : url.pathname
+      const fullPath = path.join(__dirname, '..', 'docs', filePath)
+      return net.fetch('file://' + fullPath).then((response) => {
+        const headers = new Headers(response.headers)
+        headers.set('Cross-Origin-Embedder-Policy', 'require-corp')
+        headers.set('Cross-Origin-Opener-Policy', 'same-origin')
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers,
+        })
+      })
+    })
+  }
+
   createWindow()
 
   app.on('activate', () => {
