@@ -8,7 +8,11 @@ import {
     DEFAULT_REMOTE_DIR,
 } from "@/db";
 import type { Project, Checkin, SyncState, CheckStatus } from "@/db/types";
-import { runFullSync, syncOneProject, _fullSyncInProgress } from "@/sync/fullSync";
+import {
+    runFullSync,
+    syncOneProject,
+    _fullSyncInProgress,
+} from "@/sync/fullSync";
 import type { ConflictItem } from "@/db/types";
 
 function sortProjects(projects: Project[]): Project[] {
@@ -228,9 +232,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         const repo = await getRepo();
         const cur = await repo.getCheckin(projectId, date);
         let nextStatus: CheckStatus | null;
-        if (!cur) nextStatus = "success";
+        if (!cur || cur.status === "deleted") nextStatus = "success";
         else if (cur.status === "success") nextStatus = "fail";
-        else nextStatus = null;
+        else nextStatus = "deleted";
         if (nextStatus === null) {
             await repo.deleteCheckin(projectId, date, nowMs());
         } else {
@@ -345,7 +349,11 @@ export const useAppStore = create<AppState>((set, get) => ({
                 if (cur) {
                     if (it.field === "status") {
                         if (it.remote === null)
-                            await repo.deleteCheckin(projectId, it.date, nowMs());
+                            await repo.deleteCheckin(
+                                projectId,
+                                it.date,
+                                nowMs(),
+                            );
                         else
                             await repo.upsertCheckin({
                                 ...cur,
