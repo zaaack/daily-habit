@@ -23,11 +23,8 @@ export function ProjectCard({
     const syncStatus = useAppStore((s) => s.sync.status);
     const syncAt = useAppStore((s) => s.sync.at);
     const [checkins, setCheckins] = useState<Checkin[]>([]);
-    const [refreshKey, setRefreshKey] = useState(0);
-    const onCycle = useCallback(async (projectId: string, date: string) => {
-        await cycle(projectId, date);
-        setRefreshKey((k) => k + 1);
-    }, []);
+
+    const checkinVersion = useAppStore((s) => s.checkinVersion);
 
     // Load checkins on mount, date range change, or sync completion
     useEffect(() => {
@@ -49,6 +46,7 @@ export function ProjectCard({
         dates[0],
         dates[dates.length - 1],
         syncStatus === "ok" ? syncAt : null,
+        checkinVersion,
     ]);
 
     const byDate = new Map(checkins.map((c) => [c.date, c]));
@@ -140,8 +138,7 @@ export function ProjectCard({
                                 color={project.color}
                                 compact
                                 disabled={isFuture}
-                                refreshKey={refreshKey}
-                                onCycle={() => void onCycle(project.id, d)}
+                                onCycle={() => void cycle(project.id, d)}
                             />
                         </div>
                     );

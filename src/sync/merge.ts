@@ -66,8 +66,8 @@ export function compactToCheckin(
     };
 }
 
-export function isDeletedCheckin(c: Checkin): boolean {
-    return c.status === "deleted";
+export function isDeletedAndEmptyCheckin(c: Checkin): boolean {
+    return c.status === "deleted" && c.value === null && !c.note;
 }
 
 type ProjectMeta = Omit<Project, "remoteEtag" | "remotePath">;
@@ -195,7 +195,7 @@ export function mergeProjectFile(
     }
 
     merged.sort((a, b) => a.date.localeCompare(b.date));
-    const active = merged.filter((c) => c.status !== "deleted");
+    const active = merged.filter((c) => !isDeletedAndEmptyCheckin(c));
     const changed =
         projectChanged ||
         merged.length !== localCheckins.length ||

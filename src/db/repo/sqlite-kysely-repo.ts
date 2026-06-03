@@ -259,8 +259,7 @@ export abstract class SqliteKyselyRepo implements Repo {
         let query = db
             .selectFrom("checkins")
             .selectAll()
-            .where("project_id", "=", projectId)
-            .where("status", "!=", "deleted");
+            .where("project_id", "=", projectId);
         if (range?.from) query = query.where("date", ">=", range.from);
         if (range?.to) query = query.where("date", "<=", range.to);
         const rows = await query.orderBy("date", "asc").execute();
