@@ -51,7 +51,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build frontend
-        run: ELECTRON=1 pnpm build
+        run: pnpm build
+        env:
+          ELECTRON: '1'
 
       - name: Build and Publish
         run: npx electron-builder --publish always
