@@ -1,22 +1,27 @@
-name: Build and Release Electron Apps
+name: Release
 
-'on':
+on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
     inputs:
       targets:
-        description: '要构建的目标（逗号分隔，如 linux,macos,windows）留空则构建全部'
+        description: 'Electron 构建目标（逗号分隔，如 linux,macos,windows）留空则构建全部'
         required: false
         default: 'linux,macos,windows'
         type: string
+      skip-android:
+        description: '跳过 Android APK 构建'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
 
 concurrency:
-  group: electron-release
+  group: release
   cancel-in-progress: true
 
 jobs:
@@ -27,10 +32,6 @@ jobs:
       release_id: ${{ steps.create-release.outputs.result }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
 
       - name: Get version
         id: get-version
@@ -84,7 +85,93 @@ jobs:
         env:
           VERSION: ${{ steps.get-version.outputs.version }}
 
-  # ── Desktop (Linux / macOS / Windows) ───────────────────────────────
+  # ── Build Android APK ──────────────────────────────────────────────
+  build-android:
+    needs: create-release
+    if: |
+      (github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.skip-android != 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Accept Android SDK licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web app
+        run: pnpm build
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Rename APK with version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "android/app/build/outputs/apk/debug/daily-habit-${VERSION}.apk"
+
+      - name: Upload APK to Release
+        uses: actions/github-script@v7
+        env:
+          release_id: ${{ needs.create-release.outputs.release_id }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const dir = 'android/app/build/outputs/apk/debug';
+
+            // Get existing assets to avoid duplicates
+            const { data: existingAssets } = await github.rest.repos.listReleaseAssets({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: parseInt(process.env.release_id),
+            });
+            const existingNames = new Set(existingAssets.map(asset => asset.name));
+
+            for (const file of fs.readdirSync(dir)) {
+              if (!file.endsWith('.apk')) continue;
+              
+              if (existingNames.has(file)) {
+                console.log(`Skipping existing asset: ${file}`);
+                continue;
+              }
+              
+              const data = fs.readFileSync(path.join(dir, file));
+              await github.rest.repos.uploadReleaseAsset({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: parseInt(process.env.release_id),
+                name: file,
+                data,
+              });
+              console.log(`Uploaded: ${file}`);
+            }
+
+  # ── Build Desktop (Linux / macOS / Windows) ────────────────────────
   build-desktop:
     needs: create-release
     if: github.event_name == 'push' || github.event.inputs.targets != ''
@@ -179,7 +266,7 @@ jobs:
 
   # ── Publish Release ────────────────────────────────────────────────
   publish-release:
-    needs: [create-release, build-desktop]
+    needs: [create-release, build-android, build-desktop]
     if: always() && needs.create-release.result == 'success'
     runs-on: ubuntu-latest
     steps:
@@ -187,11 +274,12 @@ jobs:
         uses: actions/github-script@v7
         env:
           release_id: ${{ needs.create-release.outputs.release_id }}
+          android_result: ${{ needs.build-android.result }}
           desktop_result: ${{ needs.build-desktop.result }}
         with:
           script: |
             const success = ['success', 'skipped'];
-            if (!success.includes(process.env.desktop_result)) {
+            if (!success.includes(process.env.android_result) || !success.includes(process.env.desktop_result)) {
               core.setFailed('Build job failed or was cancelled.');
               return;
             }
