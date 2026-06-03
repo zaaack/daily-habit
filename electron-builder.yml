@@ -4,7 +4,7 @@ directories:
     output: release
 publish:
     provider: github
-    releaseType: draft
+    # releaseType: draft
 files:
     - electron/main.cjs
     - electron/preload.cjs

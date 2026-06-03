@@ -130,14 +130,21 @@ jobs:
             const path = require('path');
             const tag = context.ref.replace('refs/tags/', '');
 
-            // Get release by tag (created by electron-builder)
-            const { data: release } = await github.rest.repos.getReleaseByTag({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag,
-            });
+            let release;
+            try {
+              ({ data: release } = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag,
+              }));
+            } catch (e) {
+              if (e.status === 404) {
+                core.warning(`Release for ${tag} not found (desktop build may have failed). Skipping APK upload.`);
+                return;
+              }
+              throw e;
+            }
 
-            // Get existing assets to avoid duplicates
             const { data: existingAssets } = await github.rest.repos.listReleaseAssets({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -148,12 +155,12 @@ jobs:
             const dir = 'artifacts';
             for (const file of fs.readdirSync(dir)) {
               if (!file.endsWith('.apk')) continue;
-              
+
               if (existingNames.has(file)) {
                 console.log(`Skipping existing asset: ${file}`);
                 continue;
               }
-              
+
               const data = fs.readFileSync(path.join(dir, file));
               await github.rest.repos.uploadReleaseAsset({
                 owner: context.repo.owner,
@@ -176,11 +183,21 @@ jobs:
         with:
           script: |
             const tag = context.ref.replace('refs/tags/', '');
-            const { data: release } = await github.rest.repos.getReleaseByTag({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag,
-            });
+
+            let release;
+            try {
+              ({ data: release } = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag,
+              }));
+            } catch (e) {
+              if (e.status === 404) {
+                core.warning(`Release for ${tag} not found (desktop build may have failed). Skipping publish.`);
+                return;
+              }
+              throw e;
+            }
 
             if (!release.draft) {
               console.log('Release is already published, skipping.');
@@ -190,7 +207,7 @@ jobs:
             const success = ['success', 'skipped'];
             const androidOk = success.includes('${{ needs.build-android.result }}');
             const desktopOk = success.includes('${{ needs.build-desktop.result }}');
-            
+
             if (!androidOk || !desktopOk) {
               core.setFailed('Build job failed or was cancelled.');
               return;
