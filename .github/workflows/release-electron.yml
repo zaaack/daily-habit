@@ -148,11 +148,25 @@ jobs:
             }
             walkDir(releaseDir);
 
+            // Get existing assets to avoid duplicates
+            const { data: existingAssets } = await github.rest.repos.listReleaseAssets({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: parseInt(process.env.release_id),
+            });
+            const existingNames = new Set(existingAssets.map(asset => asset.name));
+
             for (const file of files) {
               const data = fs.readFileSync(file);
               const name = path.basename(file);
               // Skip latest.yml (electron-builder auto-update metadata)
               if (name === 'latest.yml' || name === 'latest.yaml') continue;
+              
+              if (existingNames.has(name)) {
+                console.log(`Skipping existing asset: ${name}`);
+                continue;
+              }
+              
               await github.rest.repos.uploadReleaseAsset({
                 owner: context.repo.owner,
                 repo: context.repo.repo,

@@ -108,8 +108,22 @@ jobs:
               }
             }
 
+            // Get existing assets to avoid duplicates
+            const { data: existingAssets } = await github.rest.repos.listReleaseAssets({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.id,
+            });
+            const existingNames = new Set(existingAssets.map(asset => asset.name));
+
             for (const file of fs.readdirSync(dir)) {
               if (!file.endsWith('.apk')) continue;
+              
+              if (existingNames.has(file)) {
+                console.log(`Skipping existing asset: ${file}`);
+                continue;
+              }
+              
               const data = fs.readFileSync(path.join(dir, file));
               await github.rest.repos.uploadReleaseAsset({
                 owner: context.repo.owner,
