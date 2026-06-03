@@ -129,47 +129,11 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Rename APK with version
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          cp android/app/build/outputs/apk/debug/app-debug.apk "android/app/build/outputs/apk/debug/daily-habit-${VERSION}.apk"
-
-      - name: Upload APK to Release
-        uses: actions/github-script@v7
-        env:
-          release_id: ${{ needs.create-release.outputs.release_id }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-            const dir = 'android/app/build/outputs/apk/debug';
-
-            // Get existing assets to avoid duplicates
-            const { data: existingAssets } = await github.rest.repos.listReleaseAssets({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: parseInt(process.env.release_id),
-            });
-            const existingNames = new Set(existingAssets.map(asset => asset.name));
-
-            for (const file of fs.readdirSync(dir)) {
-              if (!file.endsWith('.apk')) continue;
-              
-              if (existingNames.has(file)) {
-                console.log(`Skipping existing asset: ${file}`);
-                continue;
-              }
-              
-              const data = fs.readFileSync(path.join(dir, file));
-              await github.rest.repos.uploadReleaseAsset({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                release_id: parseInt(process.env.release_id),
-                name: file,
-                data,
-              });
-              console.log(`Uploaded: ${file}`);
-            }
+          name: android
+          path: android/app/build/outputs/apk/debug/*.apk
 
   # ── Build Desktop (Linux / macOS / Windows) ────────────────────────
   build-desktop:
@@ -208,7 +172,30 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
-      - name: Upload artifacts to Release
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.zip
+            release/*.AppImage
+            release/*.deb
+
+  # ── Publish Release ────────────────────────────────────────────────
+  publish-release:
+    needs: [create-release, build-android, build-desktop]
+    if: always() && needs.create-release.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Upload assets to release
         uses: actions/github-script@v7
         env:
           release_id: ${{ needs.create-release.outputs.release_id }}
@@ -216,24 +203,6 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-
-            const releaseDir = 'release';
-            const files = [];
-
-            function walkDir(dir) {
-              if (!fs.existsSync(dir)) return;
-              for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-                const full = path.join(dir, entry.name);
-                if (entry.isDirectory()) walkDir(full);
-                else if (entry.name.endsWith('.exe') || entry.name.endsWith('.dmg') ||
-                         entry.name.endsWith('.zip') || entry.name.endsWith('.AppImage') ||
-                         entry.name.endsWith('.deb') || entry.name.endsWith('.yml') ||
-                         entry.name.endsWith('.yaml')) {
-                  files.push(full);
-                }
-              }
-            }
-            walkDir(releaseDir);
 
             // Get existing assets to avoid duplicates
             const { data: existingAssets } = await github.rest.repos.listReleaseAssets({
@@ -243,8 +212,13 @@ jobs:
             });
             const existingNames = new Set(existingAssets.map(asset => asset.name));
 
-            for (const file of files) {
-              const data = fs.readFileSync(file);
+            const dir = 'artifacts';
+            if (!fs.existsSync(dir)) {
+              console.log('No artifacts found');
+              return;
+            }
+
+            for (const file of fs.readdirSync(dir)) {
               const name = path.basename(file);
               // Skip latest.yml (electron-builder auto-update metadata)
               if (name === 'latest.yml' || name === 'latest.yaml') continue;
@@ -254,6 +228,7 @@ jobs:
                 continue;
               }
               
+              const data = fs.readFileSync(path.join(dir, file));
               await github.rest.repos.uploadReleaseAsset({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -264,12 +239,6 @@ jobs:
               console.log(`Uploaded: ${name}`);
             }
 
-  # ── Publish Release ────────────────────────────────────────────────
-  publish-release:
-    needs: [create-release, build-android, build-desktop]
-    if: always() && needs.create-release.result == 'success'
-    runs-on: ubuntu-latest
-    steps:
       - name: Publish release
         uses: actions/github-script@v7
         env:
