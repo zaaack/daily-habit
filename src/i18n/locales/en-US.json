@@ -56,7 +56,10 @@
     "searchPlaceholder": "Search project name or note",
     "count": "{{count}} entries",
     "exportCsv": "Export CSV",
-    "noMatches": "No matching records"
+    "noMatches": "No matching records",
+    "dateFrom": "From",
+    "dateTo": "To",
+    "loadMore": "Load more"
   },
   "settings": {
     "webdavSync": "WebDAV Sync",

@@ -56,7 +56,10 @@
     "searchPlaceholder": "搜索项目名或备注",
     "count": "共 {{count}} 条",
     "exportCsv": "导出 CSV",
-    "noMatches": "没有匹配的记录"
+    "noMatches": "没有匹配的记录",
+    "dateFrom": "开始日期",
+    "dateTo": "结束日期",
+    "loadMore": "加载更多"
   },
   "settings": {
     "webdavSync": "WebDAV 同步",

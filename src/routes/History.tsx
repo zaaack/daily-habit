@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
@@ -6,6 +6,8 @@ import { CheckinEditor } from '@/components/CheckinEditor'
 import type { Checkin, CheckStatus } from '@/db/types'
 import { cn } from '@/lib/cn'
 import { format } from 'date-fns'
+
+const PAGE_SIZE = 30
 
 export function History() {
   const { t } = useTranslation()
@@ -15,7 +17,11 @@ export function History() {
   const filterProject = params.get('project') ?? ''
   const [statusFilter, setStatusFilter] = useState<'all' | CheckStatus>('all')
   const [keyword, setKeyword] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [allCheckins, setAllCheckins] = useState<Checkin[]>([])
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const sentinelRef = useRef<HTMLDivElement>(null)
   const [editor, setEditor] = useState<{ open: boolean; c?: Checkin }>({ open: false })
 
   useEffect(() => {
@@ -36,15 +42,34 @@ export function History() {
 
   const projectById = useMemo(() => new Map(projects.map(p => [p.id, p])), [projects])
 
-  const filtered = allCheckins.filter(c => {
+  const filtered = useMemo(() => allCheckins.filter(c => {
     if (filterProject && c.projectId !== filterProject) return false
     if (statusFilter !== 'all' && c.status !== statusFilter) return false
+    if (dateFrom && c.date < dateFrom) return false
+    if (dateTo && c.date > dateTo) return false
     if (keyword && !(c.note ?? '').toLowerCase().includes(keyword.toLowerCase())
       && !(projectById.get(c.projectId)?.name ?? '').toLowerCase().includes(keyword.toLowerCase())) {
       return false
     }
     return true
-  })
+  }), [allCheckins, filterProject, statusFilter, dateFrom, dateTo, keyword, projectById])
+
+  const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount])
+  const hasMore = visibleCount < filtered.length
+
+  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [filterProject, statusFilter, dateFrom, dateTo, keyword])
+
+  const loadMore = useCallback(() => setVisibleCount(n => n + PAGE_SIZE), [])
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) loadMore()
+    }, { threshold: 0.1 })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [loadMore])
 
   function exportCSV() {
     const lines = ['date,project,status,value,note']
@@ -81,6 +106,16 @@ export function History() {
           </select>
         </div>
         <input className="input" placeholder={t('history.searchPlaceholder')} value={keyword} onChange={e => setKeyword(e.target.value)} />
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="label mb-1 block">{t('history.dateFrom')}</label>
+            <input className="input" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+          </div>
+          <div>
+            <label className="label mb-1 block">{t('history.dateTo')}</label>
+            <input className="input" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          </div>
+        </div>
         <div className="flex items-center justify-between text-xs text-slate-400">
           <div>{t('history.count', { count: filtered.length })}</div>
           <button className="btn-ghost" onClick={exportCSV}>{t('history.exportCsv')}</button>
@@ -91,7 +126,7 @@ export function History() {
         {filtered.length === 0 ? (
           <div className="text-center text-slate-400 py-10 text-sm">{t('history.noMatches')}</div>
         ) : (
-          filtered.map(c => {
+          visible.map(c => {
             const p = projectById.get(c.projectId)
             return (
               <button
@@ -116,6 +151,7 @@ export function History() {
             )
           })
         )}
+        {hasMore && <div ref={sentinelRef} className="text-center py-3 text-xs text-slate-500">{t('history.loadMore')}</div>}
       </div>
 
       {editor.c && (
