@@ -22,7 +22,7 @@ export function Modal({ open, onOpenChange, title, children, size = 'md' }: Moda
           className={cn(
             'fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2',
             'w-[92vw] rounded-2xl border border-slate-700/50 bg-slate-900/95 p-5 shadow-2xl',
-            'animate-scale-in focus:outline-none',
+            'animate-scale-in focus:outline-none flex flex-col max-h-[85vh]',
             size === 'sm' ? 'max-w-sm' : 'max-w-md',
           )}
         >
@@ -34,7 +34,9 @@ export function Modal({ open, onOpenChange, title, children, size = 'md' }: Moda
               </button>
             </Dialog.Close>
           </div>
-          {children}
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {children}
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

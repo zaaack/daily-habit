@@ -49,7 +49,7 @@ export function ConflictDialog() {
     <Dialog.Root open={open} onOpenChange={(v) => { if (!v && projectId) void clear(projectId) }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-md animate-fade-in" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[92vw] max-w-lg rounded-2xl border border-slate-700/50 bg-slate-900/95 p-5 shadow-2xl animate-scale-in focus:outline-none">
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[92vw] max-w-lg rounded-2xl border border-slate-700/50 bg-slate-900/95 p-5 shadow-2xl animate-scale-in focus:outline-none flex flex-col max-h-[85vh]">
           <div className="flex items-start justify-between mb-4">
             <div>
               <Dialog.Title className="text-base font-semibold text-slate-50">{t('conflict.title')}</Dialog.Title>
@@ -62,7 +62,7 @@ export function ConflictDialog() {
               <button className="text-slate-400 hover:text-slate-100 p-1.5 rounded-lg hover:bg-slate-800/50 transition-colors"><X size={16} /></button>
             </Dialog.Close>
           </div>
-          <div className="max-h-[60vh] overflow-y-auto space-y-2.5 pr-1">
+          <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 min-h-0">
             {items.map((it) => {
               const k = `${projectId}-${it.date}-${it.field}`
               const cur = getRes(it)
