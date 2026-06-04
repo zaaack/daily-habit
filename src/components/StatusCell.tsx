@@ -47,10 +47,10 @@ export function StatusCell({
     const isToday = date === todayStr();
 
     const base =
-        "relative grid place-items-center rounded-md border select-none transition active:scale-90";
+        "relative grid place-items-center rounded-lg border select-none transition-all duration-150 active:scale-90";
     const sizeCls = compact ? "h-9 w-9 text-xs" : "h-9 w-9 text-xs";
-    const todayCls = isToday ? "!font-bold !border-2" : "";
-    const defaultCls = "!bg-transparent !border-slate-600 !text-slate-400";
+    const todayCls = isToday ? "!font-bold !border-2 !border-brand-400/60 text-slate-50" : "text-slate-400";
+    const defaultCls = "!bg-slate-800/30 !border-slate-600/70 hover:!bg-slate-800/50";
 
     function handleClick() {
         setOptimistic(nextStatus(checkin?.status));
@@ -83,7 +83,7 @@ export function StatusCell({
                         ? {
                               background: color,
                               borderColor: color,
-                              color: "#020617",
+                              color: "#fff",
                           }
                         : status === "fail"
                           ? {

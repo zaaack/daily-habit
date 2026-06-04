@@ -78,8 +78,8 @@ export function App() {
 
     if (!ready) {
         return (
-            <div className="grid h-full place-items-center text-slate-500">
-                <div className="animate-pulse">{t("app.loading")}</div>
+            <div className="grid h-full place-items-center text-slate-400">
+                <div className="animate-pulse text-sm font-medium">{t("app.loading")}</div>
             </div>
         );
     }

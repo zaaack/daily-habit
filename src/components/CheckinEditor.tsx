@@ -27,18 +27,18 @@ export function CheckinEditor({ open, onOpenChange, projectId, date, initial, un
 
   return (
     <Modal open={open} onOpenChange={onOpenChange} title={t('checkin.edit', { date })}>
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div>
-          <div className="label mb-1">{t('checkin.status')}</div>
-          <div className="flex gap-1.5">
+          <div className="label mb-1.5">{t('checkin.status')}</div>
+          <div className="flex gap-2">
             {(['success', 'fail'] as CheckStatus[]).map(s => (
               <button
                 key={s}
                 onClick={() => setStatus(s)}
                 className={
-                  'flex-1 btn ' +
+                  'flex-1 btn py-2.5 ' +
                   (status === s
-                    ? (s === 'success' ? 'bg-brand-500 text-white' : 'bg-rose-500 text-white')
+                    ? (s === 'success' ? 'bg-brand-500 text-white shadow-sm shadow-brand-500/30' : 'bg-rose-500 text-white shadow-sm shadow-rose-500/30')
                     : 'btn-outline')
                 }
               >{s === 'success' ? t('checkin.done') : t('checkin.fail')}</button>
@@ -47,7 +47,7 @@ export function CheckinEditor({ open, onOpenChange, projectId, date, initial, un
         </div>
 
         <div>
-          <div className="label mb-1">{t('checkin.value')}{unit && <span className="text-slate-500">{t('checkin.unitLabel', { unit })}</span>}</div>
+          <div className="label mb-1.5">{t('checkin.value')}{unit && <span className="text-slate-400">{t('checkin.unitLabel', { unit })}</span>}</div>
           <input
             className="input"
             inputMode="decimal"
@@ -58,16 +58,16 @@ export function CheckinEditor({ open, onOpenChange, projectId, date, initial, un
         </div>
 
         <div>
-          <div className="label mb-1">{t('checkin.note')}</div>
+          <div className="label mb-1.5">{t('checkin.note')}</div>
           <textarea
-            className="input min-h-[64px]"
+            className="input min-h-[72px] resize-none"
             value={note}
             onChange={e => setNote(e.target.value)}
             placeholder={t('checkin.notePlaceholder')}
           />
         </div>
 
-        <div className="flex items-center gap-2 pt-1">
+        <div className="flex items-center gap-2 pt-2">
           {initial && (
             <button
               className="btn-outline text-rose-400 border-rose-900/40"

@@ -104,13 +104,13 @@ export function ValueTrendChart({ checkins, color, currentYear, currentMonth }: 
 
   return (
     <div>
-      <div className="flex items-center mb-2">
-        <button className="btn-ghost p-1" onClick={() => setPageOffset(v => v - 1)}>
+      <div className="flex items-center mb-3">
+        <button className="btn-ghost p-1.5 rounded-lg" onClick={() => setPageOffset(v => v - 1)}>
           <ChevronLeft size={14} />
         </button>
-        <div className="flex-1 text-center text-xs text-slate-500 tabular-nums">{label}</div>
+        <div className="flex-1 text-center text-xs text-slate-400 tabular-nums font-medium">{label}</div>
         <button
-          className="btn-ghost p-1"
+          className="btn-ghost p-1.5 rounded-lg"
           onClick={() => setPageOffset(v => v + 1)}
           disabled={isCurrentPage}
         >

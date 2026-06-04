@@ -26,43 +26,97 @@
   --c-slate-50: 2 6 23;
 }
 .dark {
-  --c-slate-950: 2 6 23;
-  --c-slate-900: 15 23 42;
-  --c-slate-800: 30 41 59;
-  --c-slate-700: 51 65 85;
-  --c-slate-600: 71 85 105;
-  --c-slate-500: 100 116 139;
-  --c-slate-400: 148 163 184;
-  --c-slate-300: 203 213 225;
-  --c-slate-200: 226 232 240;
-  --c-slate-100: 241 245 249;
-  --c-slate-50: 248 250 252;
+  --c-slate-950: 10 15 26;
+  --c-slate-900: 18 24 38;
+  --c-slate-800: 30 40 58;
+  --c-slate-700: 55 68 90;
+  --c-slate-600: 85 100 128;
+  --c-slate-500: 130 148 175;
+  --c-slate-400: 170 188 210;
+  --c-slate-300: 210 222 235;
+  --c-slate-200: 230 238 246;
+  --c-slate-100: 245 248 252;
+  --c-slate-50: 250 252 255;
 }
 
 @layer base {
   html, body, #root { height: 100%; }
-  body { -webkit-tap-highlight-color: transparent; transition: background-color 120ms ease; }
+  body {
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 200ms ease, color 200ms ease;
+  }
   *, *::before, *::after { box-sizing: border-box; }
   button { -webkit-touch-callout: none; user-select: none; }
+  .dark body {background: black;}
 }
 
 @layer components {
   .card {
-    @apply rounded-2xl border backdrop-blur p-3;
-    background-color: rgb(var(--c-slate-900) / 0.7);
+    @apply rounded-2xl border backdrop-blur p-3 transition-all duration-200;
+    background-color: rgb(var(--c-slate-900) / 0.8);
+    border-color: rgb(var(--c-slate-700) / 0.5);
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+  }
+  .dark .card {
+    border-color: rgb(var(--c-slate-700) / 0.6);
+    box-shadow: 0 4px 12px -2px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.2);
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
   }
-  .btn-primary { @apply btn bg-brand-500 text-slate-50 hover:bg-brand-400; }
-  .btn-ghost   { @apply btn hover:bg-slate-800/60; color: rgb(var(--c-slate-300) / 1); }
-  .btn-outline { @apply btn border border-slate-700 text-slate-200 hover:bg-slate-800/60; }
+  .btn-primary {
+    @apply btn bg-brand-500 text-white hover:bg-brand-600;
+    box-shadow: 0 2px 8px -2px rgb(34 197 94 / 0.4);
+  }
+  .dark .btn-primary {
+    box-shadow: 0 2px 12px -2px rgb(34 197 94 / 0.5);
+  }
+  .btn-ghost {
+    @apply btn hover:bg-slate-800/50;
+    color: rgb(var(--c-slate-300) / 1);
+  }
+  .btn-outline {
+    @apply btn border text-slate-200 hover:bg-slate-800/50;
+    border-color: rgb(var(--c-slate-600) / 0.6);
+  }
+  .dark .btn-outline {
+    border-color: rgb(var(--c-slate-600) / 0.5);
+  }
   .input {
-    @apply w-full rounded-lg border px-3 py-2 text-sm
-           placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500/60;
-    background-color: rgb(var(--c-slate-800) / 0.7);
-    border-color: rgb(var(--c-slate-700) / 1);
+    @apply w-full rounded-lg border px-3 py-2.5 text-sm
+           placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all duration-150;
+    background-color: rgb(var(--c-slate-800) / 0.6);
+    border-color: rgb(var(--c-slate-600) / 0.5);
     color: rgb(var(--c-slate-100) / 1);
   }
-  .label { @apply text-xs uppercase tracking-wide; color: rgb(var(--c-slate-400) / 1); }
+  .dark .input {
+    background-color: rgb(var(--c-slate-800) / 0.8);
+    border-color: rgb(var(--c-slate-600) / 0.4);
+  }
+  .input:focus {
+    border-color: rgb(var(--c-slate-500) / 0.8);
+    box-shadow: 0 0 0 3px rgb(34 197 94 / 0.15);
+  }
+  .label { @apply text-xs uppercase tracking-wider font-medium; color: rgb(var(--c-slate-400) / 1); }
+}
+
+/* Status cell grid styling */
+.dark .status-cell {
+  border-color: rgb(var(--c-slate-700) / 0.6) !important;
+}
+
+/* Scrollbar styling for dark mode */
+.dark ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.dark ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgb(var(--c-slate-600) / 0.5);
+  border-radius: 3px;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--c-slate-500) / 0.6);
 }

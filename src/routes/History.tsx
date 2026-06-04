@@ -64,7 +64,7 @@ export function History() {
 
   return (
     <div className="space-y-3">
-      <div className="card space-y-2">
+      <div className="card space-y-3">
         <div className="grid grid-cols-2 gap-2">
           <select className="input" value={filterProject} onChange={e => {
             const v = e.target.value
@@ -87,9 +87,9 @@ export function History() {
         </div>
       </div>
 
-      <div className="card divide-y divide-slate-800 p-0">
+      <div className="card divide-y divide-slate-700/50 p-0">
         {filtered.length === 0 ? (
-          <div className="text-center text-slate-500 py-8 text-sm">{t('history.noMatches')}</div>
+          <div className="text-center text-slate-400 py-10 text-sm">{t('history.noMatches')}</div>
         ) : (
           filtered.map(c => {
             const p = projectById.get(c.projectId)
@@ -97,20 +97,20 @@ export function History() {
               <button
                 key={`${c.projectId}-${c.date}`}
                 onClick={() => setEditor({ open: true, c })}
-                className="w-full text-left p-3 flex items-start gap-2 hover:bg-slate-800/30"
+                className="w-full text-left p-3.5 flex items-start gap-2.5 hover:bg-slate-800/40 transition-colors"
               >
                 <span className={cn(
-                  'h-5 w-5 rounded grid place-items-center text-xs flex-shrink-0 mt-0.5',
+                  'h-6 w-6 rounded-lg grid place-items-center text-xs flex-shrink-0 mt-0.5 font-medium',
                   'text-white',
                 )}
                 style={c.status === 'success' ? { background: p?.color ?? '#22c55e' } : { background: '#ef4444' }}
                 >{c.status === 'success' ? (c.value != null ? c.value : '✓') : '✕'}</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-sm">
-                    <span>{p?.emoji} {p?.name}</span>
-                    <span className="text-slate-500">{c.date}</span>
+                    <span className="text-slate-100">{p?.emoji} {p?.name}</span>
+                    <span className="text-slate-400">{c.date}</span>
                   </div>
-                  {c.note && <div className="text-xs text-slate-400 mt-0.5 truncate">{c.note}</div>}
+                  {c.note && <div className="text-xs text-slate-400 mt-1 truncate">{c.note}</div>}
                 </div>
               </button>
             )

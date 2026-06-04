@@ -5,8 +5,8 @@ export function NotFound() {
   const { t } = useTranslation()
   return (
     <div className="card text-center py-12">
-      <div className="text-3xl mb-2">🤔</div>
-      <div className="text-sm text-slate-400">{t('notFound.title')}</div>
+      <div className="text-4xl mb-3">🤔</div>
+      <div className="text-sm text-slate-300 font-medium">{t('notFound.title')}</div>
       <Link to="/" className="btn-primary mt-4">{t('notFound.backHome')}</Link>
     </div>
   )

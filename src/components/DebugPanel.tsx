@@ -73,23 +73,23 @@ export function DebugPanel() {
   const state = useAppStore.getState()
 
   return (
-    <div className="fixed bottom-20 right-4 z-50 w-72 rounded-lg border border-slate-600 bg-slate-900/95 p-3 text-xs font-mono text-slate-300 shadow-xl backdrop-blur">
-      <div className="mb-2 font-bold text-slate-100">Debug</div>
-      <div className="space-y-1">
+    <div className="fixed bottom-20 right-4 z-50 w-72 rounded-xl border border-slate-700/50 bg-slate-900/95 p-4 text-xs font-mono text-slate-300 shadow-2xl backdrop-blur-xl">
+      <div className="mb-3 font-bold text-slate-100 text-sm">Debug</div>
+      <div className="space-y-1.5">
         <div className="flex justify-between">
-          <span className="text-slate-500">Platform</span>
+          <span className="text-slate-400">Platform</span>
           <span>{platform}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-slate-500">Projects</span>
+          <span className="text-slate-400">Projects</span>
           <span>{state.projects.length} / {dbProjects ?? '?'}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-slate-500">Checkins</span>
+          <span className="text-slate-400">Checkins</span>
           <span>{checkinCount ?? '…'}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-slate-500">Sync</span>
+          <span className="text-slate-400">Sync</span>
           <span className={state.sync.status === 'error' ? 'text-rose-400' : 'text-emerald-400'}>
             {state.sync.status}
           </span>
@@ -97,24 +97,24 @@ export function DebugPanel() {
         {state.sync.error && (
           <div className="text-rose-400 break-all">Error: {state.sync.error}</div>
         )}
-        <hr className="border-slate-700" />
+        <hr className="border-slate-700/50 my-2" />
         {mem ? (
           <>
             <div className="flex justify-between">
-              <span className="text-slate-500">Heap Used</span>
+              <span className="text-slate-400">Heap Used</span>
               <span>{mem.used}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Heap Total</span>
+              <span className="text-slate-400">Heap Total</span>
               <span>{mem.total}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Heap Limit</span>
+              <span className="text-slate-400">Heap Limit</span>
               <span>{mem.limit}</span>
             </div>
           </>
         ) : (
-          <div className="text-slate-500">No memory info</div>
+          <div className="text-slate-400">No memory info</div>
         )}
       </div>
     </div>

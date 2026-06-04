@@ -199,8 +199,8 @@ export function ProjectDetail() {
 
     if (!project) {
         return (
-            <div className="card text-center text-slate-400 py-10">
-                <div>{t("project.notFound")}</div>
+            <div className="card text-center text-slate-400 py-12">
+                <div className="text-sm">{t("project.notFound")}</div>
                 <Link to="/" className="btn-ghost mt-3">
                     {t("project.backHome")}
                 </Link>
@@ -219,7 +219,7 @@ export function ProjectDetail() {
                     <div
                         className={cn(
                             "grid grid-cols-7 gap-1",
-                            hasToday && "bg-brand-500/5 rounded-md",
+                            hasToday && "bg-brand-500/5 rounded-lg",
                         )}
                     >
                         {w.days.map((d, j) => {
@@ -232,7 +232,7 @@ export function ProjectDetail() {
                                     className={cn(
                                         "flex justify-center",
                                         isToday &&
-                                            "border-2 border-brand-500 rounded-md",
+                                            "border-2 border-brand-500/60 rounded-lg",
                                     )}
                                 >
                                     <StatusCell
@@ -257,56 +257,57 @@ export function ProjectDetail() {
 
     return (
         <div className="space-y-3">
-            <div className="card flex items-center gap-2">
+            <div className="card flex items-center gap-3">
                 <Link
                     to="/"
-                    className="btn-ghost p-2"
+                    className="btn-ghost p-2 rounded-xl"
                     aria-label={t("project.back")}
                 >
                     <ChevronLeft size={18} />
                 </Link>
                 <span
-                    className="h-7 w-7 grid place-items-center rounded"
-                    style={{ background: project.color + "33" }}
+                    className="h-9 w-9 grid place-items-center rounded-xl text-lg shrink-0"
+                    style={{ background: project.color + "20" }}
                 >
                     {project.emoji}
                 </span>
-                <div>
-                    <div className="font-semibold">{project.name}</div>
+                <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-slate-100 truncate">{project.name}</div>
                     {project.description && (
-                        <div className="text-xs text-slate-400 mt-0.5">
+                        <div className="text-xs text-slate-400 mt-0.5 truncate">
                             {project.description}
                         </div>
                     )}
                     {project.unit && (
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-slate-400">
                             {project.unit}
                         </div>
                     )}
                 </div>
-                <div className="flex-1" />
-                {pageNum !== 0 && (
+                <div className="flex items-center gap-1">
+                    {pageNum !== 0 && (
+                        <button
+                            className="btn-ghost p-2 rounded-xl"
+                            onClick={goToCurrent}
+                            aria-label={t("project.goToCurrent")}
+                        >
+                            <RotateCcw size={14} />
+                        </button>
+                    )}
                     <button
-                        className="btn-ghost p-2"
-                        onClick={goToCurrent}
-                        aria-label={t("project.goToCurrent")}
+                        className="btn-ghost p-2 rounded-xl"
+                        onClick={() => setEditorOpen(true)}
+                        aria-label={t("project.settings")}
                     >
-                        <RotateCcw size={14} />
+                        <SettingsIcon size={16} />
                     </button>
-                )}
-                <button
-                    className="btn-ghost p-2"
-                    onClick={() => setEditorOpen(true)}
-                    aria-label={t("project.settings")}
-                >
-                    <SettingsIcon size={16} />
-                </button>
+                </div>
             </div>
 
             <div className="card">
-                <div className="relative mb-2 flex items-center justify-between">
+                <div className="relative mb-3 flex items-center justify-between">
                     <button
-                        className="flex items-center gap-1 text-sm font-semibold text-slate-200 hover:text-brand-500"
+                        className="flex items-center gap-1.5 text-sm font-semibold text-slate-100 hover:text-brand-400 transition-colors"
                         onClick={() => setPickerOpen((v) => !v)}
                     >
                         {t("project.yearMonth", {
@@ -316,21 +317,21 @@ export function ProjectDetail() {
                         <ChevronDown
                             size={14}
                             className={cn(
-                                "transition-transform",
+                                "transition-transform duration-200",
                                 pickerOpen && "rotate-180",
                             )}
                         />
                     </button>
                     <div className="flex items-center gap-1">
                         <button
-                            className="btn-ghost p-1"
+                            className="btn-ghost p-1.5 rounded-lg"
                             onClick={() => setPageNum((p) => p - 1)}
                             aria-label="previous month"
                         >
                             <ChevronLeft size={16} />
                         </button>
                         <button
-                            className="btn-ghost p-1"
+                            className="btn-ghost p-1.5 rounded-lg"
                             onClick={() => setPageNum((p) => p + 1)}
                             aria-label="next month"
                         >
@@ -338,10 +339,10 @@ export function ProjectDetail() {
                         </button>
                     </div>
                     {pickerOpen && (
-                        <div className="absolute left-0 top-full mt-1 z-10 bg-slate-900 rounded-lg shadow-lg border border-slate-700 p-2 min-w-[200px]">
-                            <div className="flex items-center gap-2 mb-2">
+                        <div className="absolute left-0 top-full mt-1 z-10 bg-slate-900/95 backdrop-blur-xl rounded-xl shadow-xl border border-slate-700/50 p-3 min-w-[200px]">
+                            <div className="flex items-center gap-2 mb-3">
                                 <select
-                                    className="flex-1 text-sm bg-slate-800 border border-slate-600 rounded px-2 py-1 text-slate-100"
+                                    className="flex-1 text-sm bg-slate-800/80 border border-slate-700/50 rounded-lg px-2.5 py-1.5 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/50"
                                     value={viewYear}
                                     onChange={(e) => {
                                         const y = Number(e.target.value);
@@ -358,7 +359,7 @@ export function ProjectDetail() {
                                     ))}
                                 </select>
                             </div>
-                            <div className="grid grid-cols-4 gap-1">
+                            <div className="grid grid-cols-4 gap-1.5">
                                 {Array.from(
                                     { length: 12 },
                                     (_, i) => i + 1,
@@ -366,10 +367,10 @@ export function ProjectDetail() {
                                     <button
                                         key={m}
                                         className={cn(
-                                            "text-xs py-1.5 rounded",
+                                            "text-xs py-2 rounded-lg transition-all duration-150",
                                             m === viewMonth
-                                                ? "bg-brand-500 text-white"
-                                                : "text-slate-300 hover:bg-slate-800",
+                                                ? "bg-brand-500 text-white font-medium shadow-sm shadow-brand-500/30"
+                                                : "text-slate-300 hover:bg-slate-800/50",
                                         )}
                                         onClick={() =>
                                             navigateToMonth(viewYear, m)
@@ -382,10 +383,10 @@ export function ProjectDetail() {
                         </div>
                     )}
                 </div>
-                <div className="grid grid-cols-7 gap-1 text-[10px] text-slate-200 mb-1">
+                <div className="grid grid-cols-7 gap-1 text-[10px] text-slate-400 mb-1.5">
                     {(t("common.dow", { returnObjects: true }) as string[]).map(
                         (d) => (
-                            <div key={d} className="text-center">
+                            <div key={d} className="text-center font-medium">
                                 {d}
                             </div>
                         ),
@@ -422,7 +423,7 @@ export function ProjectDetail() {
             </div>
 
             <div className="card">
-                <div className="text-sm font-semibold mb-2">
+                <div className="text-sm font-semibold text-slate-100 mb-3">
                     {t("project.monthlyStats")}
                 </div>
                 <MonthlyStatsChart
@@ -434,7 +435,7 @@ export function ProjectDetail() {
                 />
             </div>
             <div className="card">
-                <div className="text-sm font-semibold mb-2">
+                <div className="text-sm font-semibold text-slate-100 mb-3">
                     {t("project.valueTrend")}
                 </div>
                 <ValueTrendChart
@@ -446,7 +447,7 @@ export function ProjectDetail() {
             </div>
             <Link
                 to={`/history?project=${project.id}`}
-                className="card flex items-center justify-center text-sm text-brand-600 hover:text-brand-500"
+                className="card flex items-center justify-center text-sm text-brand-400 hover:text-brand-500 font-medium transition-colors"
             >
                 {t("project.viewAllHistory")}
             </Link>

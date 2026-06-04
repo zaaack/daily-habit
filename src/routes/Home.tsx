@@ -99,11 +99,11 @@ export function Home() {
   return (
     <div className="space-y-3">
       <div className="card">
-        <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
-          <span className="tabular-nums">{rangeLabel}</span>
+        <div className="flex items-center gap-2 text-sm text-slate-400 mb-2">
+          <span className="tabular-nums font-medium">{rangeLabel}</span>
           <button
             onClick={() => setFilterOpen(true)}
-            className="ml-auto flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200"
+            className="ml-auto flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 transition-colors"
             aria-label={t('home.filter')}
           >
             <Filter size={14} />
@@ -140,10 +140,10 @@ export function Home() {
       </div>
 
       {projects.length === 0 ? (
-        <div className="card text-center text-slate-500 py-10">
-          <div className="text-2xl mb-2">📝</div>
-          <div className="text-sm">{t('home.empty')}</div>
-          <div className="text-xs text-slate-400 mt-1">{t('home.emptyHint')}</div>
+        <div className="card text-center text-slate-400 py-12">
+          <div className="text-3xl mb-3">📝</div>
+          <div className="text-sm font-medium text-slate-300">{t('home.empty')}</div>
+          <div className="text-xs text-slate-400 mt-1.5">{t('home.emptyHint')}</div>
         </div>
       ) : (
         <div className="space-y-3">

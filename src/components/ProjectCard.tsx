@@ -69,10 +69,10 @@ export function ProjectCard({
     if (sorting) {
         return (
             <div className="card flex items-center gap-2">
-                <GripVertical size={18} className="text-slate-500 shrink-0" />
+                <GripVertical size={18} className="text-slate-400 shrink-0" />
                 <span
-                    className="h-7 w-7 grid place-items-center rounded text-base shrink-0"
-                    style={{ background: project.color + "33" }}
+                    className="h-7 w-7 grid place-items-center rounded-lg text-base shrink-0"
+                    style={{ background: project.color + "25" }}
                 >
                     {project.emoji}
                 </span>
@@ -80,7 +80,7 @@ export function ProjectCard({
                     {project.name}
                 </div>
                 {project.unit && (
-                    <div className="text-xs text-slate-500 truncate">
+                    <div className="text-xs text-slate-400 truncate">
                         · {project.unit}
                     </div>
                 )}
@@ -92,11 +92,11 @@ export function ProjectCard({
         <div className="card">
             <Link
                 to={`/project/${project.id}`}
-                className="flex items-center gap-2 mb-2 active:opacity-70"
+                className="flex items-center gap-2.5 mb-2.5 active:opacity-70"
             >
                 <span
-                    className="h-7 w-7 grid place-items-center rounded text-base"
-                    style={{ background: project.color + "33" }}
+                    className="h-8 w-8 grid place-items-center rounded-xl text-base shrink-0"
+                    style={{ background: project.color + "20" }}
                 >
                     {project.emoji}
                 </span>
@@ -106,14 +106,14 @@ export function ProjectCard({
                         project.deleted
                             ? "text-rose-500 line-through"
                             : project.archived
-                              ? "text-amber-600/70 dark:text-amber-400/70"
-                              : "text-slate-200",
+                              ? "text-amber-500 dark:text-amber-400"
+                              : "text-slate-100",
                     )}
                 >
                     {project.name}
                 </div>
                 {project.unit && (
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-slate-400">
                         · {project.unit}
                     </div>
                 )}
@@ -122,7 +122,7 @@ export function ProjectCard({
                         {t("home.failRate", { rate: failRate })}
                     </div>
                 )}
-                <ChevronRight size={16} className="ml-auto text-slate-500" />
+                <ChevronRight size={16} className="ml-auto text-slate-400" />
             </Link>
             <div className="grid grid-cols-7 gap-1.5">
                 {dates.map((d) => {

@@ -15,23 +15,23 @@ export function Layout() {
 
   return (
     <div className="min-h-full flex flex-col">
-      <header className="sticky top-0 z-30 bg-slate-950/85 backdrop-blur border-b border-slate-800">
-        <div className="mx-auto max-w-3xl px-4 py-3 flex items-center gap-2">
-          <Link to="/" className="flex items-center gap-2 text-lg font-semibold">
-            <span className="inline-block h-7 w-7 rounded-md bg-brand-500 grid place-items-center text-white">✅</span>
-            <span>Daily Habit</span>
+      <header className="sticky top-0 z-30 bg-slate-950/80 backdrop-blur-xl border-b border-slate-700/40">
+        <div className="mx-auto max-w-3xl px-4 py-3.5 flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2.5 text-lg font-semibold">
+            <span className="inline-block h-8 w-8 rounded-xl bg-brand-500 grid place-items-center text-white shadow-sm shadow-brand-500/30">✅</span>
+            <span className="text-slate-50">Daily Habit</span>
           </Link>
           <div className="flex-1" />
           <SyncBadge />
           <button
-            className="btn-ghost p-2"
+            className="btn-ghost p-2 rounded-xl"
             onClick={() => void triggerSync()}
             title={t('layout.syncNow')}
             aria-label={t('layout.syncNow')}
           >
             <RefreshCw size={16} className={sync.status === 'syncing' ? 'animate-spin' : ''} />
           </button>
-          <Link to="/settings" className="btn-ghost p-2" title={t('layout.settings')} aria-label={t('layout.settings')}>
+          <Link to="/settings" className="btn-ghost p-2 rounded-xl" title={t('layout.settings')} aria-label={t('layout.settings')}>
             <SettingsIcon size={16} />
           </Link>
         </div>
@@ -41,7 +41,7 @@ export function Layout() {
         <Outlet />
       </main>
 
-      <nav className="sticky bottom-0 z-30 bg-slate-950/90 backdrop-blur border-t border-slate-800">
+      <nav className="sticky bottom-0 z-30 bg-slate-950/85 backdrop-blur-xl border-t border-slate-700/40">
         <div className="mx-auto max-w-3xl grid grid-cols-3">
           <TabLink to="/" icon={<HomeIcon size={18} />} label={t('nav.home')} />
           <TabLink to="/history" icon={<ListChecks size={18} />} label={t('nav.history')} />
@@ -59,8 +59,8 @@ function TabLink({ to, icon, label }: { to: string; icon: React.ReactNode; label
       end={to === '/'}
       className={({ isActive }) =>
         cn(
-          'flex flex-col items-center gap-0.5 py-2 text-xs',
-          isActive ? 'text-brand-400' : 'text-slate-400 hover:text-slate-200',
+          'flex flex-col items-center gap-0.5 py-2.5 text-xs transition-colors duration-150',
+          isActive ? 'text-brand-400 font-medium' : 'text-slate-400 hover:text-slate-200',
         )
       }
     >
@@ -82,5 +82,5 @@ function SyncBadge() {
     color = 'text-slate-400'
   } else if (sync.status === 'error') { label = t('sync.error'); color = 'text-rose-400' }
   else if (sync.status === 'conflict') { label = t('sync.conflict'); color = 'text-amber-300' }
-  return <span className={cn('text-xs', color)}>{label}</span>
+  return <span className={cn('text-xs font-medium', color)}>{label}</span>
 }
