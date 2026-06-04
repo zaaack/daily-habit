@@ -9,10 +9,11 @@ interface ModalProps {
   onOpenChange: (open: boolean) => void
   title: ReactNode
   children: ReactNode
+  footer?: ReactNode
   size?: 'sm' | 'md'
 }
 
-export function Modal({ open, onOpenChange, title, children, size = 'md' }: ModalProps) {
+export function Modal({ open, onOpenChange, title, children, footer, size = 'md' }: ModalProps) {
   const { t } = useTranslation()
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -37,6 +38,7 @@ export function Modal({ open, onOpenChange, title, children, size = 'md' }: Moda
           <div className="flex-1 overflow-y-auto min-h-0">
             {children}
           </div>
+          {footer && <div className="mt-4 flex items-center gap-2">{footer}</div>}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

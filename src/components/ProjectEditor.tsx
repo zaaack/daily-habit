@@ -69,59 +69,8 @@ export function ProjectEditor({ open, onOpenChange, initial, onDelete }: Props) 
       open={open}
       onOpenChange={onOpenChange}
       title={isEdit ? t('editor.editProject') : t('editor.newProject')}
-    >
-      <div className="space-y-4">
-        <div>
-          <div className="label mb-1.5">{t('editor.name')}</div>
-          <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder={t('editor.namePlaceholder')} />
-        </div>
-        <div>
-          <div className="label mb-1.5">{t('editor.description')}</div>
-          <textarea
-            className="input resize-none min-h-[72px]"
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            placeholder={t('editor.descriptionPlaceholder')}
-          />
-        </div>
-        <div>
-          <div className="label mb-1.5">{t('editor.unit')}</div>
-          <input className="input" value={unit} onChange={e => setUnit(e.target.value)} placeholder={t('editor.unitPlaceholder')} />
-        </div>
-        <div>
-          <div className="label mb-2">{t('editor.icon')}</div>
-          <div className="flex flex-wrap gap-2">
-            {PROJECT_EMOJIS.map(e => (
-              <button
-                key={e}
-                onClick={() => setEmoji(e)}
-                className={cn(
-                  'h-9 w-9 rounded-xl grid place-items-center text-lg transition-all duration-150',
-                  emoji === e ? 'bg-brand-500/20 ring-2 ring-brand-500 shadow-sm shadow-brand-500/20' : 'bg-slate-800/50 hover:bg-slate-800',
-                )}
-              >{e}</button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <div className="label mb-2">{t('editor.color')}</div>
-          <div className="flex flex-wrap gap-2">
-            {PROJECT_COLORS.map(c => (
-              <button
-                key={c}
-                onClick={() => setColor(c)}
-                className={cn(
-                  'h-8 w-8 rounded-xl transition-all duration-150',
-                  color === c && 'ring-2 ring-offset-2 ring-offset-slate-900 ring-white shadow-sm',
-                )}
-                style={{ background: c }}
-                aria-label={`color ${c}`}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 pt-2">
+      footer={
+        <div className="flex items-center gap-2">
           {isEdit && onDelete && initial?.id && !confirmDelete && (
             <div className="flex items-center gap-2">
               {currentProject?.deleted ? (
@@ -183,6 +132,58 @@ export function ProjectEditor({ open, onOpenChange, initial, onDelete }: Props) 
           <button className="btn-primary" disabled={busy || !name.trim()} onClick={handleSubmit}>
             {isEdit ? t('editor.save') : t('editor.create')}
           </button></>}
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <div className="label mb-1.5">{t('editor.name')}</div>
+          <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder={t('editor.namePlaceholder')} />
+        </div>
+        <div>
+          <div className="label mb-1.5">{t('editor.description')}</div>
+          <textarea
+            className="input resize-none min-h-[72px]"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder={t('editor.descriptionPlaceholder')}
+          />
+        </div>
+        <div>
+          <div className="label mb-1.5">{t('editor.unit')}</div>
+          <input className="input" value={unit} onChange={e => setUnit(e.target.value)} placeholder={t('editor.unitPlaceholder')} />
+        </div>
+        <div>
+          <div className="label mb-2">{t('editor.icon')}</div>
+          <div className="flex flex-wrap gap-2">
+            {PROJECT_EMOJIS.map(e => (
+              <button
+                key={e}
+                onClick={() => setEmoji(e)}
+                className={cn(
+                  'h-9 w-9 rounded-xl grid place-items-center text-lg transition-all duration-150',
+                  emoji === e ? 'bg-brand-500/20 ring-2 ring-brand-500 shadow-sm shadow-brand-500/20' : 'bg-slate-800/50 hover:bg-slate-800',
+                )}
+              >{e}</button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="label mb-2">{t('editor.color')}</div>
+          <div className="flex flex-wrap gap-2">
+            {PROJECT_COLORS.map(c => (
+              <button
+                key={c}
+                onClick={() => setColor(c)}
+                className={cn(
+                  'h-8 w-8 rounded-xl transition-all duration-150',
+                  color === c && 'ring-2 ring-offset-2 ring-offset-slate-900 ring-white shadow-sm',
+                )}
+                style={{ background: c }}
+                aria-label={`color ${c}`}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </Modal>
