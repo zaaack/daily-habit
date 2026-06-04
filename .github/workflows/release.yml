@@ -112,17 +112,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build web app
-        run: pnpm build
-
-      - name: Sync Capacitor Android
-        run: npx cap sync android
-
-      - name: Build debug APK
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug
+      - name: Build Android APK
+        run: pnpm android:build
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
