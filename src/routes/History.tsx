@@ -59,17 +59,21 @@ export function History() {
 
   useEffect(() => { setVisibleCount(PAGE_SIZE) }, [filterProject, statusFilter, dateFrom, dateTo, keyword])
 
-  const loadMore = useCallback(() => setVisibleCount(n => n + PAGE_SIZE), [])
+  const loadMore = useCallback(() => {
+    setVisibleCount(n => n + PAGE_SIZE)
+  }, [])
 
   useEffect(() => {
-    const el = sentinelRef.current
-    if (!el) return
-    const obs = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) loadMore()
-    }, { threshold: 0.1 })
-    obs.observe(el)
-    return () => obs.disconnect()
-  }, [loadMore])
+    if (!hasMore) return
+    const onScroll = () => {
+      const el = sentinelRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      if (rect.top <= window.innerHeight + 200) loadMore()
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [hasMore, loadMore])
 
   function exportCSV() {
     const lines = ['date,project,status,value,note']
