@@ -21,9 +21,9 @@ export function Modal({ open, onOpenChange, title, children, footer, size = 'md'
         <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-md animate-fade-in" />
         <Dialog.Content
           className={cn(
-            'fixed left-1/2 top-0 bottom-0 -translate-x-1/2 z-50',
+            'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50',
             'w-[92vw] rounded-2xl border border-slate-700/50 bg-slate-900/95 p-5 shadow-2xl',
-            'animate-scale-in focus:outline-none flex flex-col',
+            'animate-scale-in focus:outline-none flex flex-col max-h-screen',
             size === 'sm' ? 'max-w-sm' : 'max-w-md',
           )}
         >

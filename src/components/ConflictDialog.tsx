@@ -49,7 +49,7 @@ export function ConflictDialog() {
     <Dialog.Root open={open} onOpenChange={(v) => { if (!v && projectId) void clear(projectId) }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-md animate-fade-in" />
-        <Dialog.Content className="fixed left-1/2 top-0 bottom-0 -translate-x-1/2 z-50 w-[92vw] max-w-lg border border-slate-700/50 bg-slate-900/95 p-5 shadow-2xl animate-scale-in focus:outline-none flex flex-col">
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[92vw] max-w-lg border border-slate-700/50 bg-slate-900/95 p-5 shadow-2xl animate-scale-in focus:outline-none flex flex-col max-h-screen">
           <div className="flex items-start justify-between mb-4">
             <div>
               <Dialog.Title className="text-base font-semibold text-slate-50">{t('conflict.title')}</Dialog.Title>
