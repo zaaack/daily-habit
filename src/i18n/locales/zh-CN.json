@@ -4,7 +4,9 @@
   },
   "layout": {
     "syncNow": "立即同步",
-    "settings": "设置"
+    "settings": "设置",
+    "sort": "排序",
+    "exitSort": "退出排序"
   },
   "nav": {
     "home": "首页",

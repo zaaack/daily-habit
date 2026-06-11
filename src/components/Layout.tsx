@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Home as HomeIcon, ListChecks, Settings as SettingsIcon, RefreshCw } from 'lucide-react'
+import { Home as HomeIcon, ListChecks, Settings as SettingsIcon, RefreshCw, MoreVertical, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
 import { cn } from '@/lib/cn'
@@ -10,6 +10,8 @@ export function Layout() {
   const { t } = useTranslation()
   const sync = useAppStore(s => s.sync)
   const triggerSync = useAppStore(s => s.triggerSync)
+  const sortMode = useAppStore(s => s.sortMode)
+  const toggleSortMode = useAppStore(s => s.toggleSortMode)
   const loc = useLocation()
   const onDetail = /^\/project\//.test(loc.pathname)
 
@@ -31,9 +33,14 @@ export function Layout() {
           >
             <RefreshCw size={16} className={sync.status === 'syncing' ? 'animate-spin' : ''} />
           </button>
-          <Link to="/settings" className="btn-ghost p-2 rounded-xl" title={t('layout.settings')} aria-label={t('layout.settings')}>
-            <SettingsIcon size={16} />
-          </Link>
+          <button
+            className="btn-ghost p-2 rounded-xl"
+            onClick={toggleSortMode}
+            title={sortMode ? t('layout.exitSort') : t('layout.sort')}
+            aria-label={sortMode ? t('layout.exitSort') : t('layout.sort')}
+          >
+            {sortMode ? <X size={16} /> : <MoreVertical size={16} />}
+          </button>
         </div>
       </header>
 

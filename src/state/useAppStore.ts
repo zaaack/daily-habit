@@ -34,6 +34,7 @@ interface AppState {
     conflicts: Record<string, ConflictItem[]>;
     filterState: FilterState;
     checkinVersion: number;
+    sortMode: boolean;
 
     init(): Promise<void>;
 
@@ -69,6 +70,8 @@ interface AppState {
     resolveConflict(projectId: string, items: ConflictItem[]): Promise<void>;
     clearConflict(projectId: string): Promise<void>;
     setFilterState(state: FilterState): void;
+    toggleSortMode(): void;
+    setSortMode(v: boolean): void;
 }
 
 let _syncInterval: ReturnType<typeof setInterval> | null = null;
@@ -80,6 +83,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     conflicts: {},
     filterState: { normal: true, archived: false, deleted: false },
     checkinVersion: 0,
+    sortMode: false,
 
     async init() {
         const timeout = new Promise<never>((_, reject) =>
@@ -408,6 +412,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     setFilterState(state) {
         set({ filterState: state });
+    },
+
+    toggleSortMode() {
+        set((s) => ({ sortMode: !s.sortMode }));
+    },
+
+    setSortMode(v) {
+        set({ sortMode: v });
     },
 }));
 

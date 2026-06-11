@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Plus, Check, Filter } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core'
@@ -34,6 +34,8 @@ export function Home() {
   const reorderProjects = useAppStore(s => s.reorderProjects)
   const filter = useAppStore(s => s.filterState)
   const setFilterState = useAppStore(s => s.setFilterState)
+  const sorting = useAppStore(s => s.sortMode)
+  const setSortMode = useAppStore(s => s.setSortMode)
   const [open, setOpen] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
 
@@ -53,9 +55,7 @@ export function Home() {
   const newest = dates[dates.length - 1]
   const rangeLabel = `${oldest.slice(5)} – ${newest.slice(5)}`
 
-  const [sorting, setSorting] = useState(false)
   const [localProjects, setLocalProjects] = useState(projects)
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -63,21 +63,11 @@ export function Home() {
     }),
   )
 
+  useEffect(() => {
+    if (sorting) setLocalProjects(projects)
+  }, [sorting, projects])
+
   const displayProjects = sorting ? localProjects : projects
-
-  const startSortMode = () => {
-    setSorting(true)
-    setLocalProjects(projects)
-    navigator.vibrate?.(10)
-  }
-
-  const handlePointerDown = () => {
-    longPressTimer.current = setTimeout(startSortMode, 600)
-  }
-
-  const handlePointerUp = () => {
-    clearTimeout(longPressTimer.current)
-  }
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
@@ -92,7 +82,7 @@ export function Home() {
   }
 
   const doneSorting = () => {
-    setSorting(false)
+    setSortMode(false)
     reorderProjects(localProjects.map(p => p.id))
   }
 
@@ -157,11 +147,7 @@ export function Home() {
             </DndContext>
           ) : (
             displayProjects.map(p => (
-              <div
-                key={p.id}
-                onPointerDown={handlePointerDown}
-                onPointerUp={handlePointerUp}
-              >
+              <div key={p.id}>
                 <ProjectCard project={p} dates={dates} />
               </div>
             ))

@@ -4,7 +4,9 @@
   },
   "layout": {
     "syncNow": "Sync now",
-    "settings": "Settings"
+    "settings": "Settings",
+    "sort": "Sort",
+    "exitSort": "Exit sort"
   },
   "nav": {
     "home": "Home",
