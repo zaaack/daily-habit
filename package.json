@@ -16,6 +16,9 @@
     "cap:sync": "cap sync android",
     "cap:open:android": "cap open android",
     "android:build": "VITE_BASE_URL=/ pnpm build && cap sync android && cd android && ./gradlew assembleDebug",
+    "android:run": "pnpm android:build && adb -s ${ANDROID_SERIAL:-$(adb devices | sed -n '2p' | cut -f1)} install -r android/app/build/outputs/apk/debug/app-debug.apk && adb -s ${ANDROID_SERIAL:-$(adb devices | sed -n '2p' | cut -f1)} shell am start -n com.dailyhabit.app/.MainActivity",
+    "android:devices": "adb devices -l",
+    "android:dev": "export DEVICE=${ANDROID_SERIAL:-$(adb devices | sed -n '2p' | cut -f1)} && adb -s $DEVICE reverse tcp:5173 tcp:5173 && CAP_LIVERELOAD=1 cap run android --livereload --external",
     "electron:dev": "ELECTRON=1 pnpm build && electron .",
     "electron:build": "ELECTRON=1 pnpm build && electron-builder"
   },

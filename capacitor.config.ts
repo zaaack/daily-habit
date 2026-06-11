@@ -5,10 +5,14 @@ const config: CapacitorConfig = {
   appName: 'Daily Habit',
   webDir: 'docs',
   android: {
-    allowMixedContent: false,
+    allowMixedContent: true,
   },
   server: {
     androidScheme: 'https',
+    ...(process.env.CAP_LIVERELOAD === '1' && {
+      url: 'http://localhost:5173',
+      cleartext: true,
+    }),
   },
 }
 
