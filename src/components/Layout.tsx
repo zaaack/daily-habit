@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Home as HomeIcon, ListChecks, Settings as SettingsIcon, RefreshCw, MoreVertical, X } from 'lucide-react'
+import { Home as HomeIcon, ListChecks, Settings as SettingsIcon, RefreshCw, ArrowUpDown, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
 import { cn } from '@/lib/cn'
@@ -39,7 +39,7 @@ export function Layout() {
             title={sortMode ? t('layout.exitSort') : t('layout.sort')}
             aria-label={sortMode ? t('layout.exitSort') : t('layout.sort')}
           >
-            {sortMode ? <X size={16} /> : <MoreVertical size={16} />}
+            {sortMode ? <X size={16} /> : <ArrowUpDown size={16} />}
           </button>
         </div>
       </header>
