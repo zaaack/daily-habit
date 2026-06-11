@@ -68,7 +68,7 @@ export function ProjectCard({
 
     if (sorting) {
         return (
-            <div className="card flex items-center gap-2">
+            <div className="card flex items-center gap-2" style={{ touchAction: 'none' }}>
                 <GripVertical size={18} className="text-slate-400 shrink-0" />
                 <span
                     className="h-7 w-7 grid place-items-center rounded-lg text-base shrink-0"
