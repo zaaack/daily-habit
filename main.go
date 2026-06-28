@@ -22,7 +22,7 @@ func main() {
 	err := wails.Run(&options.App{
 		Title:            "Daily Habit",
 		Width:            800,
-		Height:           600,
+Height:          500,
 		MinWidth:         360,
 		MinHeight:        500,
 		DisableResize:    false,

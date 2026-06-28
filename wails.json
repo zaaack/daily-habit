@@ -3,7 +3,7 @@
   "name": "daily-habit",
   "output": "wails-build",
   "frontend:install": "pnpm install",
-  "frontend:build": "pnpm build",
+  "frontend:build": "cross-env WAILS=1 pnpm build",
   "frontend:dev:watcher": "pnpm dev",
   "frontend:dev:serverUrl": "http://localhost:5173",
   "author": {
