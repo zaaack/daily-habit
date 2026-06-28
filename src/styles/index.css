@@ -44,8 +44,10 @@
   body {
     -webkit-tap-highlight-color: transparent;
     transition: background-color 200ms ease, color 200ms ease;
-    background: rgb(var(--c-slate-950) / 1);
+    background: #f8fafc;
   }
+  .dark body { background: #0a0f1a; }
+  #root { background: inherit; }
 }
 
 @layer components {

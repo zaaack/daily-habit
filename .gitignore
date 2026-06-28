@@ -31,6 +31,9 @@ release
 
 # Wails
 wails-build/
+frontend/wailsjs/
+build/windows/
+build/darwin/
 
 # Go
 *.exe
