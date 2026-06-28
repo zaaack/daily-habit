@@ -10,6 +10,7 @@ import { NotFound } from "@/routes/NotFound";
 import { Layout } from "@/components/Layout";
 import { ConflictDialog } from "@/components/ConflictDialog";
 import { DebugPanel } from "@/components/DebugPanel";
+import { isWails } from "@/lib/platform";
 
 const router = createHashRouter([
     {
@@ -69,7 +70,9 @@ export function App() {
         const onKey = (e: KeyboardEvent) => {
             if (e.key === "F12") {
                 e.preventDefault();
-                (window as any).electronAPI?.toggleDevTools();
+                if (isWails) {
+                    (window as any).go?.main?.App?.ToggleDevTools();
+                }
             }
         };
         window.addEventListener("keydown", onKey);

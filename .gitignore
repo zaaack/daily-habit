@@ -28,3 +28,15 @@ dist-ssr
 dist-electron
 # build
 release
+
+# Wails
+wails-build/
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out

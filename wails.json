@@ -1,0 +1,19 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "daily-habit",
+  "output": "wails-build",
+  "frontend:install": "pnpm install",
+  "frontend:build": "pnpm build",
+  "frontend:dev:watcher": "pnpm dev",
+  "frontend:dev:serverUrl": "http://localhost:5173",
+  "author": {
+    "name": "Daily Habit",
+    "email": "noreply@daily-habit.app"
+  },
+  "info": {
+    "companyName": "Daily Habit",
+    "productName": "Daily Habit",
+    "productVersion": "0.1.7",
+    "copyright": "Copyright 2024 Daily Habit"
+  }
+}

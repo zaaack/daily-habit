@@ -2,8 +2,8 @@ import path from 'node:path'
 import { defineConfig, type PluginOption } from 'vite'
 import react from '@vitejs/plugin-react'
 
-const isElectron = process.env.ELECTRON === '1'
-const base = isElectron ? '/' : (process.env.VITE_BASE_URL || '/daily-habit/')
+const isDesktop = process.env.ELECTRON === '1' || process.env.WAILS === '1'
+const base = isDesktop ? '/' : (process.env.VITE_BASE_URL || '/daily-habit/')
 
 async function createPlugins(): Promise<PluginOption[]> {
   const plugins: PluginOption[] = [react()]
@@ -11,7 +11,7 @@ async function createPlugins(): Promise<PluginOption[]> {
 const { default: sqlocalVitePlugin } = await import('sqlocal/vite')
 plugins.push(sqlocalVitePlugin({ coi: true }))
     
-  if (!isElectron) {
+  if (!isDesktop) {
     const { VitePWA } = await import('vite-plugin-pwa')
     plugins.push(
       VitePWA({
@@ -53,7 +53,7 @@ export default defineConfig({
     },
   },
   server: {
-        port: 5173, strictPort: isElectron,
+        port: 5173, strictPort: isDesktop,
         headers: {
           'Cross-Origin-Embedder-Policy': 'require-corp',
           'Cross-Origin-Opener-Policy': 'same-origin',

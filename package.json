@@ -4,7 +4,7 @@
   "author": "Daily Habit <noreply@daily-habit.app>",
   "version": "0.1.7",
   "type": "module",
-  "main": "electron/main.cjs",
+  "main": "main.go",
   "scripts": {
     "preversion": "pnpm build",
     "dev": "vite",
@@ -19,8 +19,11 @@
     "android:run": "pnpm android:build && adb -s ${ANDROID_SERIAL:-$(adb devices | sed -n '2p' | cut -f1)} install -r android/app/build/outputs/apk/debug/app-debug.apk && adb -s ${ANDROID_SERIAL:-$(adb devices | sed -n '2p' | cut -f1)} shell am start -n com.dailyhabit.app/.MainActivity",
     "android:devices": "adb devices -l",
     "android:dev": "export DEVICE=${ANDROID_SERIAL:-$(adb devices | sed -n '2p' | cut -f1)} && adb -s $DEVICE reverse tcp:5173 tcp:5173 && CAP_LIVERELOAD=1 cap run android --livereload --external",
-    "electron:dev": "ELECTRON=1 pnpm build && electron .",
-    "electron:build": "ELECTRON=1 pnpm build && electron-builder"
+    "desktop:dev": "wails dev",
+    "desktop:build": "WAILS=1 pnpm build && wails build",
+    "desktop:build:windows": "WAILS=1 pnpm build && wails build -platform windows/amd64",
+    "desktop:build:mac": "WAILS=1 pnpm build && wails build -platform darwin/amd64",
+    "desktop:build:linux": "WAILS=1 pnpm build && wails build -platform linux/amd64"
   },
   "devDependencies": {
     "@capacitor-community/sqlite": "^6.0.2",
@@ -45,8 +48,6 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "dexie": "^4.0.10",
-    "electron": "^35.0.0",
-    "electron-builder": "^26.0.0",
     "eslint": "^10.4.1",
     "i18next": "^26.3.0",
     "kysely": "^0.28.0",
