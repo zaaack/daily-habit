@@ -44,10 +44,8 @@
   body {
     -webkit-tap-highlight-color: transparent;
     transition: background-color 200ms ease, color 200ms ease;
+    background: rgb(var(--c-slate-950) / 1);
   }
-  *, *::before, *::after { box-sizing: border-box; }
-  button { -webkit-touch-callout: none; user-select: none; }
-  .dark body {background: black;}
 }
 
 @layer components {
