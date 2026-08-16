@@ -283,6 +283,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             await new Promise((r) => setTimeout(r, 200));
         }
         const repo = await getRepo();
+        const startAt = nowMs();
         set((s) => ({
             sync: { ...s.sync, status: "syncing", pending: s.sync.pending + 1 },
         }));
@@ -297,14 +298,13 @@ export const useAppStore = create<AppState>((set, get) => ({
                     set({ projects: sortProjects(projects), checkinVersion: get().checkinVersion + 1 });
                 },
             });
-            const at = nowMs();
-            await repo.setKV("sync.lastAt", at);
+            await repo.setKV("sync.lastAt", startAt);
             await repo.deleteKV("sync.lastError");
             set((s) => ({
                 sync: {
                     ...s.sync,
                     status: "ok",
-                    at,
+                    at: startAt,
                     error: null,
                     pending: Math.max(0, s.sync.pending - 1),
                 },
@@ -341,10 +341,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     async resolveConflict(projectId, items) {
         const repo = await getRepo();
-        const resolvedItems = items.map((i) => ({
-            ...i,
-            resolution: i.resolution ?? ("local" as const),
-        }));
+        const resolvedItems = items
+            .map((i) => ({
+                ...i,
+                resolution: i.resolution ?? ("local" as const),
+            }))
+            .filter((i) => i.date !== "__project__");
         for (const it of resolvedItems) {
             const cur = await repo.getCheckin(projectId, it.date);
             if (it.resolution === "local") {
