@@ -41,7 +41,7 @@ Path alias: `@/*` → `src/*` (set in both `tsconfig.json` and `vite.config.ts`)
 - The conflict dialog is mounted globally in `App.tsx`; `resolveConflict` always defaults each item's `resolution` to `'local'` if missing.
 
 ## Deploy
-- Web: push to `main` → `.github/workflows/deploy.yml` (pnpm 9, Node 22) builds and publishes `docs/` to GitHub Pages at `/daily-habit/`. The workflow copies `docs/index.html` to `docs/404.html` for SPA routing — local builds don't need this.
+- Web: push to `main` → `.github/workflows/deploy.yml` (pnpm 11, Node 22) builds and publishes `docs/` to GitHub Pages at `/daily-habit/`. The workflow copies `docs/index.html` to `docs/404.html` for SPA routing — local builds don't need this.
 - Cloudflare Workers: `pnpm build:cf && npx wrangler deploy` deploys `docs/` via Cloudflare Workers + Assets. `wrangler.jsonc` sets `not_found_handling: "single-page-application"` for SPA fallback. `public/_headers` provides COOP/COEP headers (native Workers support).
 - Android: local-only, no CI.
 - Desktop (Wails): `pnpm desktop:build` builds for the current platform. Output in `wails-build/`. Requires: Go 1.23+, Wails CLI v2, CGO enabled, WebView2 runtime (Windows). Cross-compile with `-platform` flag.
