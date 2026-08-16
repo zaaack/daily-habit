@@ -2,7 +2,7 @@
   "name": "daily-habit",
   "private": true,
   "author": "Daily Habit <noreply@daily-habit.app>",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "type": "module",
   "main": "main.go",
   "scripts": {
