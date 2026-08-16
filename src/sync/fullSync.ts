@@ -116,11 +116,13 @@ export async function runFullSync(
 
     if (p.remoteEtag === remoteEtag) {
       // etag 匹配 → 检查本地是否有新变更，有则上传
-      if (lastSyncAt && p.updatedAt <= lastSyncAt) {
+      const checkins = await repo.getCheckinsAll(p.id)
+      const maxCheckinAt = checkins.reduce((m, c) => Math.max(m, c.updatedAt), 0)
+      if (lastSyncAt && p.updatedAt <= lastSyncAt && maxCheckinAt <= lastSyncAt) {
         // 本地无新变更，无需上传
         refreshedProjects.push(p)
       } else {
-        const file = await buildFile(p, await repo.getCheckinsAll(p.id))
+        const file = await buildFile(p, checkins)
         try {
           const newEtag = await client.putFileContents(p.remotePath, JSON.stringify(file, null, 2), {
             contentLength: false,
