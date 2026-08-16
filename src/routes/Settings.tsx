@@ -298,7 +298,9 @@ export function Settings() {
         </div>
       )}
 
-      <div className="text-center text-xs text-slate-400 pt-3 pb-2">Daily Habit · v0.0.1</div>
+      <div className="text-center text-xs text-slate-400 pt-3 pb-2">
+        <a href="https://github.com/zaaack/daily-habit" target="_blank" rel="noreferrer" className="hover:text-slate-200">Daily Habit</a> · v0.0.1
+      </div>
     </div>
   )
 }
