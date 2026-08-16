@@ -20,85 +20,85 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── Build Desktop (Linux / macOS / Windows) ────────────────────────
-  build-desktop:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - goos: windows
-            goarch: amd64
-            suffix: .exe
-            runner: windows-latest
-          - goos: linux
-            goarch: amd64
-            suffix: ''
-            runner: ubuntu-22.04
-          - goos: darwin
-            goarch: universal
-            suffix: ''
-            runner: macos-latest
-
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install Linux dependencies
-        if: matrix.goos == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
-
-      - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
-
-      - name: Install JS dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build frontend
-        run: pnpm build
-        env:
-          WAILS: '1'
-
-      - name: Build desktop app
-        run: wails build --platform ${{ matrix.goos }}/${{ matrix.goarch }} -o daily-habit${{ matrix.suffix }}
-
-      - name: List build output
-        shell: bash
-        run: ls -la wails-build/
-
-      - name: Package
-        shell: bash
-        run: |
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            cd wails-build && 7z a ../daily-habit-${{ matrix.goos }}-${{ matrix.goarch }}.zip daily-habit${{ matrix.suffix }} && cd ..
-          elif [ "${{ matrix.goos }}" = "darwin" ]; then
-            cd wails-build && tar czf ../daily-habit-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz daily-habit.app && cd ..
-          else
-            tar czf daily-habit-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz -C wails-build daily-habit
-          fi
-
-      - name: Upload to Release
-        if: github.event_name == 'push'
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          files: daily-habit-${{ matrix.goos }}-*
+  # ══ Build Desktop (Linux / macOS / Windows) — disabled ══════════════
+  # build-desktop:
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - goos: windows
+  #           goarch: amd64
+  #           suffix: .exe
+  #           runner: windows-latest
+  #         - goos: linux
+  #           goarch: amd64
+  #           suffix: ''
+  #           runner: ubuntu-22.04
+  #         - goos: darwin
+  #           goarch: universal
+  #           suffix: ''
+  #           runner: macos-latest
+  #
+  #   runs-on: ${{ matrix.runner }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
+  #
+  #     - uses: actions/setup-go@v5
+  #       with:
+  #         go-version: '1.23'
+  #
+  #     - uses: pnpm/action-setup@v4
+  #       with:
+  #         version: 11
+  #
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 22
+  #         cache: pnpm
+  #
+  #     - name: Install Linux dependencies
+  #       if: matrix.goos == 'linux'
+  #       run: |
+  #         sudo apt-get update
+  #         sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+  #
+  #     - name: Install Wails
+  #       run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+  #
+  #     - name: Install JS dependencies
+  #       run: pnpm install --frozen-lockfile
+  #
+  #     - name: Build frontend
+  #       run: pnpm build
+  #       env:
+  #         WAILS: '1'
+  #
+  #     - name: Build desktop app
+  #       run: wails build --platform ${{ matrix.goos }}/${{ matrix.goarch }} -o daily-habit${{ matrix.suffix }}
+  #
+  #     - name: List build output
+  #       shell: bash
+  #       run: ls -la wails-build/
+  #
+  #     - name: Package
+  #       shell: bash
+  #       run: |
+  #         if [ "${{ matrix.goos }}" = "windows" ]; then
+  #           cd wails-build && 7z a ../daily-habit-${{ matrix.goos }}-${{ matrix.goarch }}.zip daily-habit${{ matrix.suffix }} && cd ..
+  #         elif [ "${{ matrix.goos }}" = "darwin" ]; then
+  #           cd wails-build && tar czf ../daily-habit-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz daily-habit.app && cd ..
+  #         else
+  #           tar czf daily-habit-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz -C wails-build daily-habit
+  #         fi
+  #
+  #     - name: Upload to Release
+  #       if: github.event_name == 'push'
+  #       uses: softprops/action-gh-release@v2
+  #       with:
+  #         draft: true
+  #         files: daily-habit-${{ matrix.goos }}-*
 
   # ── Build Android APK ──────────────────────────────────────────────
   build-android:
@@ -152,7 +152,7 @@ jobs:
 
   # ── Upload Android APK to Release ──────────────────────────────────
   upload-android:
-    needs: [build-desktop, build-android]
+    needs: [build-android]
     if: always() && needs.build-android.result == 'success'
     runs-on: ubuntu-latest
     steps:
@@ -179,10 +179,17 @@ jobs:
               }));
             } catch (e) {
               if (e.status === 404) {
-                core.warning(`Release for ${tag} not found (desktop build may have failed). Skipping APK upload.`);
-                return;
+                core.warning(`Release for ${tag} not found, creating draft release.`);
+                ({ data: release } = await github.rest.repos.createRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  tag_name: tag,
+                  name: tag,
+                  draft: true,
+                }));
+              } else {
+                throw e;
               }
-              throw e;
             }
 
             const { data: existingAssets } = await github.rest.repos.listReleaseAssets({
@@ -214,7 +221,7 @@ jobs:
 
   # ── Publish Release ────────────────────────────────────────────────
   publish-release:
-    needs: [build-desktop, build-android]
+    needs: [build-android, upload-android]
     if: always() && !cancelled()
     runs-on: ubuntu-latest
     steps:
@@ -246,9 +253,8 @@ jobs:
 
             const success = ['success', 'skipped'];
             const androidOk = success.includes('${{ needs.build-android.result }}');
-            const desktopOk = success.includes('${{ needs.build-desktop.result }}');
 
-            if (!androidOk || !desktopOk) {
+            if (!androidOk) {
               core.setFailed('Build job failed or was cancelled.');
               return;
             }
