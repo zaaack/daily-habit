@@ -73,6 +73,9 @@ func (p *WebDAVProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PROPFIND, MOVE, COPY, MKCOL")
 	w.Header().Set("Access-Control-Allow-Headers", "*")
 	w.Header().Set("Access-Control-Expose-Headers", "*")
+	// 同步依赖每次都能读到远端最新内容：禁止 WebView 按 Last-Modified 做启发式缓存，
+	// 否则 GET 可能直接返回缓存副本，其它设备刚写入的打卡拉不下来。
+	w.Header().Set("Cache-Control", "no-store")
 
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
