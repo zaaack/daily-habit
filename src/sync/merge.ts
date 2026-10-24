@@ -48,6 +48,7 @@ export function checkinToCompact(c: Checkin): CompactCheckin {
         s: c.status === "deleted" ? -1 : c.status === "success" ? 1 : 0,
         v: c.value,
         n: c.note,
+        // 秒（保留小数位以维持毫秒精度），读取时用 Math.round 消除浮点误差
         u: c.updatedAt / 1000,
     };
 }
@@ -62,7 +63,7 @@ export function compactToCheckin(
         status: c.s === 1 ? "success" : c.s === -1 ? "deleted" : "fail",
         value: c.v,
         note: c.n,
-        updatedAt: c.u * 1000,
+        updatedAt: Math.round(c.u * 1000),
     };
 }
 
@@ -216,4 +217,48 @@ function pickField(
     if (f === "status") return c.status;
     if (f === "value") return c.value;
     return c.note;
+}
+
+/**
+ * 状态指纹：字段顺序固定、打卡按日期排序。
+ * 用于判断「本地 / 合并结果 / 远端文件」是否等价，是同步上传决策的基础。
+ */
+export function fingerprint(
+    project: ProjectMeta,
+    checkins: Checkin[],
+): string {
+    return JSON.stringify([
+        [
+            project.id,
+            project.name,
+            project.description,
+            project.unit ?? null,
+            project.emoji,
+            project.color,
+            project.sort ?? 0,
+            project.createdAt,
+            project.updatedAt,
+            project.deleted,
+            project.archived,
+        ],
+        [...checkins]
+            .sort((a, b) => a.date.localeCompare(b.date))
+            .map((c) => [
+                c.date,
+                c.status,
+                c.value ?? null,
+                c.note ?? null,
+                c.updatedAt,
+            ]),
+    ]);
+}
+
+/** 远端文件的状态指纹 */
+export function projectFileFingerprint(file: ProjectFile): string {
+    return fingerprint(
+        file.project,
+        file.checkins.map((c) =>
+            compactToCheckin(file.project.id, c),
+        ),
+    );
 }
