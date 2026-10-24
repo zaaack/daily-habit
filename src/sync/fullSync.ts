@@ -1,21 +1,28 @@
 import { getClient, normalizeDir, type WebDavConfig } from './webdav'
 import {
-  mergeProjectFile,
+  mergeProjectMeta,
+  mergeCheckinLists,
   checkinToCompact,
   compactToCheckin,
   fingerprint,
-  projectFileFingerprint,
+  projectFingerprint,
+  checkinsHash,
+  groupCheckinsByQuarter,
+  quarterHashes,
+  dedupeCheckins,
   dateStrToEpochDay,
-  type ProjectFile,
+  type ProjectMeta,
+  type ProjectMetaFile,
+  type QuarterFile,
 } from './merge'
 import type { Repo } from '@/db/repo/Repo'
-import type { Project, Checkin } from '@/db/types'
+import type { Project, Checkin, ConflictItem } from '@/db/types'
 import type { WebDAVClient } from 'webdav'
 import { makeRemotePath } from '@/db/schema'
 
 const SYNC_CONFIG_KEY = 'webdav.config'
-
-type ProjectMeta = Omit<Project, 'remoteEtag' | 'remotePath'>
+const QUARTER_FILE_RE = /^(\d{4})-Q([1-4])\.json$/
+const QUARTER_KEY_RE = /^\d{4}-Q[1-4]$/
 
 /** 防止并发 runFullSync */
 export let _fullSyncInProgress = false
@@ -53,7 +60,7 @@ export async function testConnection(cfg: WebDavConfig): Promise<{ ok: boolean; 
 
 export async function runFullSync(
   repo: Repo,
-  hooks: { onConflict: (projectId: string, items: import('@/db/types').ConflictItem[]) => void; onProjectsChange: (projects: Project[]) => void } = { onConflict: () => {}, onProjectsChange: () => {} },
+  hooks: { onConflict: (projectId: string, items: ConflictItem[]) => void; onProjectsChange: (projects: Project[]) => void } = { onConflict: () => {}, onProjectsChange: () => {} },
 ): Promise<void> {
   const cfg = getSyncConfig()
   if (!cfg) return
@@ -78,19 +85,19 @@ export async function runFullSync(
     for (const p0 of localProjects) {
       // 每次迭代重新读取本地最新数据，防止并发导入/修改导致使用过期快照
       const p = (await repo.getProject(p0.id)) ?? p0
-      const filename = p.remotePath.split('/').pop()!
+      const filename = basenameOf(p.remotePath)
       const onRemote = remoteByName.has(filename)
       const remoteEtag = remoteByName.get(filename) ?? null
       remoteByName.delete(filename)
 
       if (!onRemote) {
-        // 远端确实没有该文件 → 上传本地
+        // 远端确实没有该文件 → 上传本地（元数据 + 按季度拆分的打卡文件）
         const localCheckins = await repo.getCheckinsAll(p.id)
-        if (await uploadFile(client, repo, p, buildFile(p, localCheckins))) changed = true
+        if (await uploadProject(client, repo, p, localCheckins)) changed = true
         continue
       }
 
-      const fetched = await fetchRemoteFile(client, p.remotePath)
+      const fetched = await fetchProjectMeta(client, p.remotePath, p.id)
       if (!fetched.ok) {
         if (!fetched.notFound) {
           // 读不到远端内容（网络/权限/解析失败）→ 保留本地，下次重试，绝不上传覆盖
@@ -98,65 +105,78 @@ export async function runFullSync(
         }
         // 列表里有、实际取不到：文件刚被删 → 用本地内容重建
         const localCheckins = await repo.getCheckinsAll(p.id)
-        if (await uploadFile(client, repo, p, buildFile(p, localCheckins))) changed = true
+        if (await uploadProject(client, repo, p, localCheckins)) changed = true
         continue
       }
-      const remoteFile = fetched.file
 
-      const localCheckins = await repo.getCheckinsAll(p.id)
-      const merged = mergeProjectFile(stripProject(p), localCheckins, remoteFile)
-      if (merged.conflicts.length > 0) hooks.onConflict(p.id, merged.conflicts)
-
-      const localState = fingerprint(stripProject(p), localCheckins)
-      const mergedState = fingerprint(merged.project, merged.checkinsAll)
-      const mergedProject: Project = { ...p, ...merged.project, remoteEtag }
-
-      if (localState !== mergedState) {
-        await repo.upsertProject(mergedProject)
-        for (const c of merged.checkinsAll) await repo.upsertCheckin(c)
-        changed = true
-      }
-
-      // 关键：与「远端内容」比较决定是否上传，而不是与本地比较。
-      // 否则当远端只是本地的子集时（例如手机刚打了卡、远端还没这个记录），
-      // 合并结果等于本地，就会误判为「无需上传」，打卡永远同步不出去。
-      if (mergedState !== projectFileFingerprint(remoteFile)) {
-        if (await uploadFile(client, repo, mergedProject, buildFile(mergedProject, merged.checkinsAll))) {
-          changed = true
-        }
-      } else if (p.remoteEtag !== remoteEtag) {
-        await repo.upsertProject({ ...mergedProject, remoteEtag })
-      }
+      const result = await syncProject(
+        client,
+        repo,
+        p,
+        remoteEtag,
+        fetched.meta.project,
+        fetched.meta.quarters,
+        fetched.meta.legacyCheckins,
+        true,
+      )
+      if (result.conflicts.length > 0) hooks.onConflict(p.id, result.conflicts)
+      if (result.changed) changed = true
     }
 
     // 远端有 / 本地无 → 下载
     for (const [filename, etag] of remoteByName) {
       const path = `${cfg.remoteDir}/${filename}`
-      const fetched = await fetchRemoteFile(client, path)
-      if (!fetched.ok) continue
       const projectId = filename.replace(/\.json$/, '')
+      const fetched = await fetchProjectMeta(client, path, projectId)
+      if (!fetched.ok) continue
+
       const existing = await repo.getProject(projectId)
       if (existing) {
-        const localCheckins = await repo.getCheckinsAll(projectId)
-        const merged = mergeProjectFile(stripProject(existing), localCheckins, fetched.file)
-        if (merged.conflicts.length > 0) hooks.onConflict(projectId, merged.conflicts)
-        await repo.upsertProject({
-          ...existing,
-          ...merged.project,
-          remotePath: path,
-          remoteEtag: etag,
-        })
-        for (const c of merged.checkinsAll) await repo.upsertCheckin(c)
-      } else {
-        const newProject: Project = {
-          ...fetched.file.project,
-          sort: fetched.file.project.sort ?? 0,
-          remotePath: path,
-          remoteEtag: etag,
-          deleted: 0,
-        } as Project
-        await repo.upsertProject(newProject)
-        for (const c of fetched.file.checkins) await repo.upsertCheckin(compactToCheckin(fetched.file.project.id, c))
+        const project = { ...existing, remotePath: path }
+        const result = await syncProject(
+          client,
+          repo,
+          project,
+          etag,
+          fetched.meta.project,
+          fetched.meta.quarters,
+          fetched.meta.legacyCheckins,
+          true,
+        )
+        if (result.conflicts.length > 0) {
+          hooks.onConflict(projectId, result.conflicts)
+        }
+        if (result.changed) changed = true
+        continue
+      }
+
+      const remoteData = await fetchRemoteProjectData(
+        client,
+        projectId,
+        path,
+        fetched.meta.legacyCheckins,
+        fetched.meta.quarters,
+        {},
+      )
+      if (!remoteData.ok) continue
+
+      const newProject: Project = {
+        ...fetched.meta.project,
+        sort: fetched.meta.project.sort ?? 0,
+        remotePath: path,
+        remoteEtag: etag,
+      }
+      await repo.upsertProject(newProject)
+      if (remoteData.checkins.length > 0) {
+        await repo.bulkUpsertCheckins(remoteData.checkins)
+      }
+      if (fetched.meta.legacyCheckins !== null) {
+        // 顺手把旧版单文件迁移为元数据 + 季度文件
+        const etag = await writeProjectFiles(client, newProject, remoteData.checkins)
+        if (etag !== null) {
+          newProject.remoteEtag = etag
+          await repo.upsertProject(newProject)
+        }
       }
       changed = true
     }
@@ -177,36 +197,425 @@ export async function syncOneProject(projectId: string): Promise<void> {
   const p = await repo.getProject(projectId)
   if (!p) return
   const client = await getClient(cfg)
-  const localCheckins = await repo.getCheckinsAll(p.id)
 
-  const fetched = await fetchRemoteFile(client, p.remotePath)
+  const fetched = await fetchProjectMeta(client, p.remotePath, p.id)
   if (!fetched.ok) {
     if (!fetched.notFound) return
     // 远端没有该文件 → 直接上传
-    await uploadFile(client, repo, p, buildFile(p, localCheckins))
+    const localCheckins = await repo.getCheckinsAll(p.id)
+    await uploadProject(client, repo, p, localCheckins)
     return
   }
 
-  const merged = mergeProjectFile(stripProject(p), localCheckins, fetched.file)
-  const mergedProject: Project = { ...p, ...merged.project }
-  const localState = fingerprint(stripProject(p), localCheckins)
-  const mergedState = fingerprint(merged.project, merged.checkinsAll)
-
-  if (localState !== mergedState) {
-    await repo.upsertProject(mergedProject)
-    for (const c of merged.checkinsAll) await repo.upsertCheckin(c)
-  }
-
-  if (merged.conflicts.length > 0) {
+  const result = await syncProject(
+    client,
+    repo,
+    p,
+    p.remoteEtag,
+    fetched.meta.project,
+    fetched.meta.quarters,
+    fetched.meta.legacyCheckins,
+    false,
+  )
+  if (!result.ok) return
+  if (result.conflicts.length > 0) {
     const { useAppStore } = await import('@/state/useAppStore')
-    useAppStore.setState((s) => ({ conflicts: { ...s.conflicts, [p.id]: merged.conflicts } }))
+    useAppStore.setState((s) => ({
+      conflicts: { ...s.conflicts, [p.id]: result.conflicts },
+    }))
     // 冲突交给用户决定，解决后会触发全量同步
-    return
+  }
+}
+
+interface ProjectSyncResult {
+  ok: boolean
+  changed: boolean
+  conflicts: ConflictItem[]
+}
+
+/**
+ * 合并项目元数据与所有季度打卡文件，按需写回本地和远端。
+ * ok=false 表示远端数据读不全，本轮不能做上传决策。
+ */
+async function syncProject(
+  client: WebDAVClient,
+  repo: Repo,
+  p: Project,
+  remoteEtag: string | null,
+  remoteMeta: ProjectMeta,
+  remoteQuarters: Record<string, string> | null,
+  legacyCheckins: Checkin[] | null,
+  uploadOnConflict: boolean,
+): Promise<ProjectSyncResult> {
+  const localCheckins = await repo.getCheckinsAll(p.id)
+  const metaMerge = mergeProjectMeta(stripProject(p), remoteMeta)
+  const mergedProject: Project = { ...p, ...metaMerge.project, remoteEtag }
+  const localHashes = quarterHashes(localCheckins)
+
+  const remoteData = await fetchRemoteProjectData(
+    client,
+    p.id,
+    p.remotePath,
+    legacyCheckins,
+    remoteQuarters,
+    localHashes,
+  )
+  if (!remoteData.ok) return { ok: false, changed: false, conflicts: [] }
+
+  const mergedCheckins = mergeCheckinLists(localCheckins, remoteData.checkins)
+  const conflicts = [...metaMerge.conflicts, ...mergedCheckins.conflicts]
+
+  const localState = fingerprint(stripProject(p), localCheckins)
+  const mergedState = fingerprint(mergedProject, mergedCheckins.checkinsAll)
+  const localChanged = localState !== mergedState
+  let changed = false
+
+  if (localChanged) {
+    await repo.upsertProject(mergedProject)
+    if (mergedCheckins.checkinsAll.length > 0) {
+      await repo.bulkUpsertCheckins(mergedCheckins.checkinsAll)
+    }
+    changed = true
   }
 
-  if (mergedState !== projectFileFingerprint(fetched.file)) {
-    await uploadFile(client, repo, mergedProject, buildFile(mergedProject, merged.checkinsAll))
+  if (conflicts.length > 0 && !uploadOnConflict) {
+    return { ok: true, changed, conflicts }
   }
+
+  const mergedGroups = groupCheckinsByQuarter(mergedCheckins.checkinsAll)
+  const quarterDir = quarterDirOf(p.remotePath)
+  const manifest: Record<string, string> = {}
+  const quartersToUpload: [string, Checkin[]][] = []
+  for (const quarter of new Set([...remoteData.hashes.keys(), ...mergedGroups.keys()])) {
+    const merged = mergedGroups.get(quarter) ?? []
+    const mergedHash = checkinsHash(merged)
+    manifest[quarter] = mergedHash
+    if (remoteData.hashes.get(quarter) !== mergedHash) {
+      quartersToUpload.push([quarter, merged])
+    }
+  }
+
+  if (quartersToUpload.length > 0) {
+    await ensureDirectory(client, quarterDir)
+    for (const [quarter, checkins] of quartersToUpload) {
+      if (!(await writeQuarterFile(client, p.id, quarterDir, quarter, checkins))) {
+        // 季度文件写失败时保留旧元数据，避免远端进入半迁移状态
+        return { ok: true, changed, conflicts }
+      }
+    }
+  }
+
+  const metaChanged =
+    projectFingerprint(stripProject(mergedProject)) !== projectFingerprint(remoteMeta) ||
+    legacyCheckins !== null ||
+    !sameManifest(remoteQuarters, manifest)
+  if (metaChanged) {
+    const etag = await writeProjectMeta(client, mergedProject, manifest)
+    if (etag !== null) {
+      await repo.upsertProject({ ...mergedProject, remoteEtag: etag })
+    }
+  } else if (!localChanged && p.remoteEtag !== remoteEtag) {
+    await repo.upsertProject({ ...mergedProject, remoteEtag })
+  }
+
+  return { ok: true, changed, conflicts }
+}
+
+function sameManifest(
+  a: Record<string, string> | null,
+  b: Record<string, string>,
+): boolean {
+  if (!a) return false
+  const aKeys = Object.keys(a)
+  const bKeys = Object.keys(b)
+  if (aKeys.length !== bKeys.length) return false
+  return aKeys.every((key) => a[key] === b[key])
+}
+
+interface RemoteMeta {
+  project: ProjectMeta
+  /** v3 元数据中的季度摘要；旧格式或缺失时为 null */
+  quarters: Record<string, string> | null
+  /** 旧版单文件内的打卡；v3 元数据文件为 null */
+  legacyCheckins: Checkin[] | null
+}
+
+type MetaFetchResult =
+  | { ok: true; meta: RemoteMeta }
+  | { ok: false; notFound: boolean }
+
+async function fetchProjectMeta(
+  client: WebDAVClient,
+  path: string,
+  fallbackId: string,
+): Promise<MetaFetchResult> {
+  try {
+    const data = await client.getFileContents(path, { format: 'text' })
+    const raw: any = JSON.parse(data as string)
+    const project = normalizeProjectMeta(raw?.project, fallbackId)
+    const isV3 = raw?.version === 3
+    const legacyCheckins = isV3 ? null : normalizeLegacyCheckins(raw, project.id)
+    const quarters = isV3 ? normalizeQuarterManifest(raw?.quarters) : null
+    return { ok: true, meta: { project, quarters, legacyCheckins } }
+  } catch (e: any) {
+    const status = e?.status ?? e?.response?.status
+    if (status !== 404) {
+      console.warn('[sync] fetchProjectMeta failed:', path, status ?? e?.message ?? e)
+    }
+    return { ok: false, notFound: status === 404 }
+  }
+}
+
+/** 把旧格式 (version 1/2) 的打卡统一转成 Checkin */
+function normalizeLegacyCheckins(raw: any, projectId: string): Checkin[] {
+  const list = Array.isArray(raw?.checkins) ? raw.checkins : []
+  const out: Checkin[] = []
+  for (const c of list) {
+    if (typeof c?.date === 'string') {
+      out.push({
+        projectId,
+        date: c.date,
+        status:
+          c.status === 'success'
+            ? 'success'
+            : c.status === 'deleted'
+              ? 'deleted'
+              : 'fail',
+        value: c.value ?? null,
+        note: c.note ?? null,
+        updatedAt: Number(c.updatedAt ?? 0),
+      })
+      continue
+    }
+    if (typeof c?.d !== 'number' && typeof c?.d !== 'string') continue
+    out.push(
+      compactToCheckin(projectId, {
+        d: typeof c.d === 'number' ? c.d : dateStrToEpochDay(c.d),
+        s:
+          c.s === 1 || c.s === 'success'
+            ? 1
+            : c.s === -1 || c.s === 'deleted'
+              ? -1
+              : 0,
+        v: c.v ?? null,
+        n: c.n ?? null,
+        u: Number(c.u ?? 0),
+      }),
+    )
+  }
+  return out
+}
+
+function normalizeQuarterManifest(raw: any): Record<string, string> | null {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const out: Record<string, string> = {}
+  for (const [key, value] of Object.entries(raw)) {
+    if (QUARTER_KEY_RE.test(key) && typeof value === 'string') out[key] = value
+  }
+  return out
+}
+
+function normalizeProjectMeta(raw: any, fallbackId: string): ProjectMeta {
+  return {
+    id: String(raw?.id ?? fallbackId),
+    name: String(raw?.name ?? ''),
+    description: String(raw?.description ?? ''),
+    unit: raw?.unit ?? null,
+    emoji: String(raw?.emoji ?? '📌'),
+    color: String(raw?.color ?? '#22c55e'),
+    sort: Number(raw?.sort ?? 0),
+    createdAt: Number(raw?.createdAt ?? 0),
+    updatedAt: Number(raw?.updatedAt ?? 0),
+    deleted: raw?.deleted ? 1 : 0,
+    archived: raw?.archived ? 1 : 0,
+  }
+}
+
+type RemoteDataResult =
+  | { ok: true; hashes: Map<string, string>; checkins: Checkin[] }
+  | { ok: false }
+
+/**
+ * 读取项目的季度文件。元数据里有摘要且与本地一致的季度不再下载，
+ * 只拉取可能发生变化的季度；旧单文件中的打卡一并纳入。
+ */
+async function fetchRemoteProjectData(
+  client: WebDAVClient,
+  projectId: string,
+  metaPath: string,
+  legacyCheckins: Checkin[] | null,
+  manifest: Record<string, string> | null,
+  localHashes: Record<string, string>,
+): Promise<RemoteDataResult> {
+  const dir = quarterDirOf(metaPath)
+  const listed = await listQuarterFiles(client, dir)
+  if (!listed.ok && !listed.notFound) return { ok: false }
+
+  const entries = listed.ok ? listed.files : []
+  const remoteNames = new Set(entries.map((entry) => entry.quarter))
+  const hashes = new Map<string, string>()
+  const all: Checkin[] = [...(legacyCheckins ?? [])]
+
+  for (const entry of entries) {
+    const localHash = localHashes[entry.quarter] ?? checkinsHash([])
+    const knownHash = manifest?.[entry.quarter]
+    if (knownHash !== undefined && knownHash === localHash) {
+      hashes.set(entry.quarter, knownHash)
+      continue
+    }
+    const data = await fetchQuarterFile(client, entry.path, projectId)
+    if (!data.ok) return { ok: false }
+    hashes.set(entry.quarter, checkinsHash(data.checkins))
+    all.push(...data.checkins)
+  }
+
+  for (const quarter of Object.keys(manifest ?? {})) {
+    if (!remoteNames.has(quarter)) hashes.set(quarter, checkinsHash([]))
+  }
+
+  return { ok: true, hashes, checkins: dedupeCheckins(all) }
+}
+
+async function fetchQuarterFile(
+  client: WebDAVClient,
+  path: string,
+  projectId: string,
+): Promise<{ ok: true; checkins: Checkin[] } | { ok: false }> {
+  try {
+    const data = await client.getFileContents(path, { format: 'text' })
+    const raw: any = JSON.parse(data as string)
+    const list = Array.isArray(raw?.checkins) ? raw.checkins : []
+    return {
+      ok: true,
+      checkins: list.map((c: any) => compactToCheckin(projectId, c)),
+    }
+  } catch (e) {
+    console.warn('[sync] fetchQuarterFile failed:', path, e)
+    return { ok: false }
+  }
+}
+
+interface QuarterEntry {
+  quarter: string
+  path: string
+}
+
+type QuarterListResult =
+  | { ok: true; files: QuarterEntry[] }
+  | { ok: false; notFound: boolean }
+
+async function listQuarterFiles(
+  client: WebDAVClient,
+  dir: string,
+): Promise<QuarterListResult> {
+  try {
+    const list = await client.getDirectoryContents(dir)
+    const items = Array.isArray(list) ? list : ((list as any)?.data ?? [])
+    const files: QuarterEntry[] = []
+    for (const f of items) {
+      if (f?.type === 'directory') continue
+      const name = f?.basename ?? (typeof f?.filename === 'string' ? f.filename.split('/').pop() : '')
+      const m = typeof name === 'string' ? QUARTER_FILE_RE.exec(name) : null
+      if (!m) continue
+      files.push({ quarter: `${m[1]}-Q${m[2]}`, path: `${dir}/${name}` })
+    }
+    return { ok: true, files }
+  } catch (e: any) {
+    const status = e?.status ?? e?.response?.status
+    return { ok: false, notFound: status === 404 }
+  }
+}
+
+async function writeQuarterFile(
+  client: WebDAVClient,
+  projectId: string,
+  dir: string,
+  quarter: string,
+  checkins: Checkin[],
+): Promise<boolean> {
+  const file: QuarterFile = {
+    version: 1,
+    projectId,
+    quarter,
+    checkins: checkins.map(checkinToCompact),
+  }
+  try {
+    await client.putFileContents(`${dir}/${quarter}.json`, JSON.stringify(file, null, 2), {
+      contentLength: false,
+    })
+    return true
+  } catch (e) {
+    console.warn('[sync] writeQuarterFile failed:', quarter, e)
+    return false
+  }
+}
+
+async function ensureDirectory(client: WebDAVClient, dir: string): Promise<void> {
+  try {
+    await client.createDirectory(dir, { recursive: true })
+  } catch { /* 目录已存在 */ }
+}
+
+async function writeProjectMeta(
+  client: WebDAVClient,
+  p: Project,
+  quarters: Record<string, string>,
+): Promise<string | null> {
+  const file: ProjectMetaFile = {
+    version: 3,
+    project: stripProject(p),
+    quarters: sortManifest(quarters),
+  }
+  try {
+    await client.putFileContents(p.remotePath, JSON.stringify(file, null, 2), {
+      contentLength: false,
+    })
+    return await getDirEntryEtag(client, p.remotePath)
+  } catch (e) {
+    console.warn('[sync] writeProjectMeta failed:', p.remotePath, e)
+    return null
+  }
+}
+
+/** 上传项目元数据与全部季度打卡文件，返回元数据文件的新 etag */
+async function writeProjectFiles(
+  client: WebDAVClient,
+  p: Project,
+  checkins: Checkin[],
+): Promise<string | null> {
+  const groups = groupCheckinsByQuarter(dedupeCheckins(checkins))
+  const manifest: Record<string, string> = {}
+  if (groups.size > 0) {
+    const dir = quarterDirOf(p.remotePath)
+    await ensureDirectory(client, dir)
+    for (const [quarter, cs] of groups) {
+      if (!(await writeQuarterFile(client, p.id, dir, quarter, cs))) return null
+      manifest[quarter] = checkinsHash(cs)
+    }
+  }
+  return writeProjectMeta(client, p, manifest)
+}
+
+function sortManifest(manifest: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(manifest).sort(([a], [b]) => a.localeCompare(b)),
+  )
+}
+
+/**
+ * 上传单个项目并记录新 etag。
+ * 不做任何「是否值得上传」的判断 —— 由调用方比较本地/合并结果与远端内容后决定。
+ */
+async function uploadProject(
+  client: WebDAVClient,
+  repo: Repo,
+  p: Project,
+  checkins: Checkin[],
+): Promise<boolean> {
+  const etag = await writeProjectFiles(client, p, checkins)
+  if (etag === null) return false
+  await repo.upsertProject({ ...p, remoteEtag: etag })
+  return true
 }
 
 /** 统一 etag 格式：去掉外层引号和 weak 标记（如 W/"abc" → abc） */
@@ -261,81 +670,6 @@ async function getDirEntryEtag(client: WebDAVClient, path: string): Promise<stri
   }
 }
 
-/**
- * 上传单个项目文件并记录新 etag。
- * 不做任何「是否值得上传」的判断 —— 由调用方比较本地/合并结果与远端内容后决定。
- */
-async function uploadFile(
-  client: WebDAVClient,
-  repo: Repo,
-  p: Project,
-  file: ProjectFile,
-): Promise<boolean> {
-  try {
-    await client.putFileContents(p.remotePath, JSON.stringify(file, null, 2), {
-      contentLength: false,
-    })
-    const newEtag = await getDirEntryEtag(client, p.remotePath)
-    await repo.upsertProject({ ...p, remoteEtag: newEtag })
-    return true
-  } catch (e) {
-    console.warn('[sync] upload failed:', p.remotePath, e)
-    /* 留待下次同步重试 */
-    return false
-  }
-}
-
-type FetchResult =
-  | { ok: true; file: ProjectFile }
-  | { ok: false; notFound: boolean }
-
-/**
- * 读取远端项目文件。
- * 显式不使用 If-None-Match：etag 在处理链路上并不可靠（部分服务端不返回、
- * 或内容变化后 etag 不变），缓存协商可能导致漏拉取。
- */
-async function fetchRemoteFile(client: WebDAVClient, path: string): Promise<FetchResult> {
-  try {
-    const data = await client.getFileContents(path, { format: 'text' })
-    return { ok: true, file: normalizeProjectFile(JSON.parse(data as string)) }
-  } catch (e: any) {
-    const status = e?.status
-    if (status !== 404) console.warn('[sync] fetchRemoteFile failed:', path, status ?? e?.message ?? e)
-    return { ok: false, notFound: status === 404 }
-  }
-}
-
-/** 把旧格式 (version 1) 和新格式 (version 2) 统一为 compact 格式 */
-function normalizeProjectFile(raw: any): ProjectFile {
-  if (raw?.version === 2) return raw as ProjectFile
-  // version 1 (old): d=string, s='success'|'fail', project may include remotePath
-  const { remotePath: _rp, ...proj } = raw?.project ?? {}
-  return {
-    version: 2,
-    project: proj,
-    checkins: (raw?.checkins ?? []).map((c: any) => ({
-      d: typeof c.d === 'number' ? c.d : dateStrToEpochDay(c.d),
-      s: c.s === 'success' || c.s === 1 ? 1 : 0,
-      v: c.v ?? null,
-      n: c.n ?? null,
-      u: c.u,
-    })),
-  }
-}
-
-function buildFile(p: Project | ProjectMeta, checkins: Checkin[]): ProjectFile {
-  return {
-    version: 2,
-    project: stripProject(p),
-    checkins: checkins.map(checkinToCompact),
-  }
-}
-
-function stripProject(p: Project | ProjectMeta): ProjectMeta {
-  const { remoteEtag: _, remotePath: _rp, ...rest } = p as Project
-  return rest
-}
-
 export async function cleanupDeletedProjects(): Promise<{ cleaned: number } | null> {
   const cfg = getSyncConfig()
   if (!cfg) return null
@@ -352,10 +686,29 @@ export async function cleanupDeletedProjects(): Promise<{ cleaned: number } | nu
     if (p.deleted !== 1) continue
     if (now - p.updatedAt < NINETY_DAYS) continue
 
-    if (await uploadFile(client, repo, p, buildFile(p, []))) cleaned++
+    const etag = await writeProjectMeta(client, p, {})
+    if (etag === null) continue
+    await repo.upsertProject({ ...p, remoteEtag: etag })
+    await deleteQuarterFiles(client, quarterDirOf(p.remotePath))
+    cleaned++
   }
 
   return { cleaned }
+}
+
+async function deleteQuarterFiles(
+  client: WebDAVClient,
+  dir: string,
+): Promise<void> {
+  const listed = await listQuarterFiles(client, dir)
+  if (!listed.ok) return
+  for (const file of listed.files) {
+    try {
+      await client.deleteFile(file.path)
+    } catch (e) {
+      console.warn('[sync] deleteQuarterFile failed:', file.path, e)
+    }
+  }
 }
 
 /** 导入数据后直接上传到远端，设置 remoteEtag，避免后续 sync 走 merge 覆盖 */
@@ -366,20 +719,21 @@ export async function uploadImportedProject(
   const cfg = getSyncConfig()
   if (!cfg) return null
   const client = await getClient(cfg)
-  const file: ProjectFile = {
-    version: 2,
-    project: stripProject(project),
-    checkins: checkins.map(checkinToCompact),
-  }
-  try {
-    await client.putFileContents(project.remotePath, JSON.stringify(file, null, 2), {
-      contentLength: false,
-    })
-    return await getDirEntryEtag(client, project.remotePath)
-  } catch (e) {
-    console.warn('[sync] uploadImportedProject failed:', e)
-    return null
-  }
+  return writeProjectFiles(client, project, checkins)
+}
+
+function basenameOf(path: string): string {
+  return path.split('/').pop()!
+}
+
+/** `/dir/{projectId}.json` → `/dir/{projectId}` */
+function quarterDirOf(remotePath: string): string {
+  return remotePath.replace(/\.json$/i, '')
+}
+
+function stripProject(p: Project | ProjectMeta): ProjectMeta {
+  const { remoteEtag: _, remotePath: _rp, ...rest } = p as Project
+  return rest
 }
 
 export { makeRemotePath }

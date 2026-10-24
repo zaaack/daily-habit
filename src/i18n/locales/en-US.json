@@ -61,7 +61,8 @@
     "noMatches": "No matching records",
     "dateFrom": "From",
     "dateTo": "To",
-    "loadMore": "Load more"
+    "loadMore": "Load more",
+    "quarter": "Q{{quarter}} {{year}}"
   },
   "settings": {
     "webdavSync": "WebDAV Sync",

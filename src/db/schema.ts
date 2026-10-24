@@ -41,6 +41,11 @@ export function shiftDateStr(s: string, days: number): string {
   return todayStr(dt)
 }
 
+export function quarterOfDate(date: string): string {
+  const [year, month] = date.split('-').map(Number)
+  return `${year}-Q${Math.floor((month - 1) / 3) + 1}`
+}
+
 export function monthDays(year: number, month: number): string[] {
   const days = new Date(year, month + 1, 0).getDate()
   return Array.from({ length: days }, (_, i) =>

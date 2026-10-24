@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
 import { CheckinEditor } from '@/components/CheckinEditor'
 import type { Checkin, CheckStatus } from '@/db/types'
 import { cn } from '@/lib/cn'
+import { quarterOfDate } from '@/db/schema'
 import { format } from 'date-fns'
 
 const PAGE_SIZE = 30
@@ -130,28 +131,37 @@ export function History() {
         {filtered.length === 0 ? (
           <div className="text-center text-slate-400 py-10 text-sm">{t('history.noMatches')}</div>
         ) : (
-          visible.map(c => {
+          visible.map((c, i) => {
             const p = projectById.get(c.projectId)
+            const quarter = quarterOfDate(c.date)
+            const prevQuarter = i > 0 ? quarterOfDate(visible[i - 1].date) : null
+            const [quarterYear, quarterNum] = quarter.split('-Q')
             return (
-              <button
-                key={`${c.projectId}-${c.date}`}
-                onClick={() => setEditor({ open: true, c })}
-                className="w-full text-left p-3.5 flex items-start gap-2.5 hover:bg-slate-800/40 transition-colors"
-              >
-                <span className={cn(
-                  'h-6 w-6 rounded-lg grid place-items-center text-xs flex-shrink-0 mt-0.5 font-medium',
-                  'text-white',
-                )}
-                style={c.status === 'success' ? { background: p?.color ?? '#22c55e' } : { background: '#ef4444' }}
-                >{c.status === 'success' ? (c.value != null ? c.value : '✓') : '✕'}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-slate-100">{p?.emoji} {p?.name}</span>
-                    <span className="text-slate-400">{c.date}</span>
+              <Fragment key={`${c.projectId}-${c.date}`}>
+                {quarter !== prevQuarter && (
+                  <div className="px-3.5 py-2 text-xs font-medium text-slate-400 bg-slate-800/30">
+                    {t('history.quarter', { year: quarterYear, quarter: quarterNum })}
                   </div>
-                  {c.note && <div className="text-xs text-slate-400 mt-1 truncate">{c.note}</div>}
-                </div>
-              </button>
+                )}
+                <button
+                  onClick={() => setEditor({ open: true, c })}
+                  className="w-full text-left p-3.5 flex items-start gap-2.5 hover:bg-slate-800/40 transition-colors"
+                >
+                  <span className={cn(
+                    'h-6 w-6 rounded-lg grid place-items-center text-xs flex-shrink-0 mt-0.5 font-medium',
+                    'text-white',
+                  )}
+                  style={c.status === 'success' ? { background: p?.color ?? '#22c55e' } : { background: '#ef4444' }}
+                  >{c.status === 'success' ? (c.value != null ? c.value : '✓') : '✕'}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-slate-100">{p?.emoji} {p?.name}</span>
+                      <span className="text-slate-400">{c.date}</span>
+                    </div>
+                    {c.note && <div className="text-xs text-slate-400 mt-1 truncate">{c.note}</div>}
+                  </div>
+                </button>
+              </Fragment>
             )
           })
         )}

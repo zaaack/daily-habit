@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## Project
-每日打卡 PWA + Android + Desktop app. **Capacitor 6** + **Wails 2** + **React 19** + **TypeScript** + **Vite 6** + **Zustand** + **Dexie (web) / Capacitor SQLite (Android) / OPFS SQLite (Desktop)** + **WebDAV** sync. Each project is one JSON file on the remote, synced via ETag optimistic locking with field-level LWW merge and a conflict dialog.
+每日打卡 PWA + Android + Desktop app. **Capacitor 6** + **Wails 2** + **React 19** + **TypeScript** + **Vite 6** + **Zustand** + **Dexie (web) / Capacitor SQLite (Android) / OPFS SQLite (Desktop)** + **WebDAV** sync. Each project keeps one metadata JSON plus one JSON per quarter (3 months) of checkins on the remote, synced via ETag optimistic locking with field-level LWW merge and a conflict dialog. Legacy single-file project data is migrated on sync.
 
 ## Commands
 - `pnpm dev` — Vite dev (browser only, runs against Dexie)
@@ -20,7 +20,7 @@ No tests, no Husky, no commitlint.
 - `src/main.tsx` → `src/App.tsx` — uses `createHashRouter` (NOT `BrowserRouter`; intentional for Android/PWA). `App` calls `useAppStore.init()` once and shows `ConflictDialog` at the root.
 - `src/state/useAppStore.ts` — single zustand store. **All data mutations go through here** (addProject, updateProject, deleteProject, cycleCheckin, setCheckin, triggerSync, resolveConflict). Every mutation fires `syncOneProject(...)` or `triggerSync()` as fire-and-forget; sync errors set `sync.status='error'`.
 - `src/db/` — `Repo` interface + `DexieRepo` (web fallback) + `SqlocalRepo` (web/primary, OPFS SQLite) + `SqliteRepo` (Android Capacitor SQLite). `getRepo()` is a module-level singleton, picks implementation via `isAndroid` from `src/lib/platform.ts`. New persistence code must implement `Repo`; don't bypass it.
-- `src/sync/fullSync.ts` — full sync loop + `syncOneProject`. `mergeProjectFile` (in `src/sync/merge.ts`) is field-level LWW by `updatedAt`; ties with differing fields become `ConflictItem`s and surface via `useAppStore.conflicts`.
+- `src/sync/fullSync.ts` — full sync loop + `syncOneProject`. Remote layout is `{remoteDir}/{projectId}.json` (project metadata, v3, with a `quarters` hash manifest) plus `{remoteDir}/{projectId}/{year}-Q{n}.json` (checkins). Only quarters whose manifest hash differs from local are downloaded. `mergeProjectMeta` / `mergeCheckinLists` (in `src/sync/merge.ts`) are field-level LWW by `updatedAt`; ties with differing fields become `ConflictItem`s and surface via `useAppStore.conflicts`.
 - `src/components/`, `src/routes/` — UI; `ProjectCard` polls checkins every 2s.
 - `scripts/generate-icons.mjs` — uses `sharp` to render PNG icons from `public/favicon.svg` into `public/` (web), `build/` (Wails desktop), and `android/`.
 - `main.go` — Wails 2 entry point. Embeds `docs/` via `//go:embed`. Creates `BrowserWindow` with WebView2.
@@ -34,8 +34,9 @@ Path alias: `@/*` → `src/*` (set in both `tsconfig.json` and `vite.config.ts`)
 - Android scheme is `https` in `capacitor.config.ts`; `allowMixedContent: false`. WebView loads `docs/` directly (no live reload URL configured).
 - Wails uses a **local HTTP proxy** (Go `net/http` reverse proxy) to avoid CORS issues with WebDAV sync. The proxy starts on a random available port (OS-assigned via `net.Listen("tcp", "127.0.0.1:0")`). The frontend calls `window.go.main.App.SetWebdavProxyTarget(url)` then uses `http://127.0.0.1:{port}` as the WebDAV base URL. The proxy forwards all requests to the real WebDAV server and adds CORS headers.
 - WebDAV config is stored in KV under key `webdav.config` (see `src/sync/fullSync.ts`). Default remote dir is `/daily-habit` (constant `DEFAULT_REMOTE_DIR` in `src/db/schema.ts`).
-- Deletion is **soft** (`Project.deleted: 0|1`); sync still uploads deleted projects so other devices see the tombstone.
-- ETag flow: `getDirEntryEtag` is called after every `putFileContents` because the `webdav` lib returns an opaque value, not the real ETag. Don't try to cache it across requests.
+- Deletion is **soft** (`Project.deleted: 0|1`); sync still uploads deleted projects so other devices see the tombstone. Cleaning a deleted project clears its quarterly checkin files.
+- Checkins are split by quarter, not month or year. The project metadata file must be written **after** its quarterly files so a failed upload never leaves a v3 metadata file without the migrated checkins.
+- ETag flow: `getDirEntryEtag` is called after project metadata uploads because the `webdav` lib returns an opaque value, not the real ETag. Quarterly checkin files don't store etags. Don't try to cache etags across requests.
 - The merge's "remote" upload uses `contentLength: false` — required for some WebDAV servers; do not "fix" it.
 - Build output is `docs/` (not `dist/`). `VITE_BASE_URL` env var controls the asset base path; defaults to `/daily-habit/` (GitHub Pages). Set to `/` for root deployments (Cloudflare Pages, custom domain, Wails desktop builds).
 - The conflict dialog is mounted globally in `App.tsx`; `resolveConflict` always defaults each item's `resolution` to `'local'` if missing.

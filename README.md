@@ -12,7 +12,7 @@
 - 数字单位、备注
 - 首页：项目列表 + 最近 N 天打卡状态（3-7 滑块自由选），单元格点击循环、双击/长按弹窗编辑
 - 详情页：月度热力图 + uPlot 折线 + 历史查询
-- WebDAV 同步（启动 + 打卡后触发），每项目一个 JSON，ETag 乐观锁，冲突弹窗
+- WebDAV 同步（启动 + 打卡后触发），项目元数据 + 按季度拆分的打卡 JSON，ETag 乐观锁，冲突弹窗
 - 跨平台：Android（Capacitor 6 + Capacitor SQLite）/ Web（PWA，Dexie/IndexedDB）
 
 ### 开发
@@ -52,7 +52,7 @@ pnpm android:build    # 打包 APK
 - Numeric values, notes
 - Home: project list + last N day heatmap (3-7 slider), single-click cycle, double-click/long-press edit
 - Detail: monthly heatmap + uPlot line chart + history
-- WebDAV sync (on startup & after check-in), one JSON per project, ETag optimistic locking, conflict dialog
+- WebDAV sync (on startup & after check-in), project metadata plus quarterly check-in JSON files, ETag optimistic locking, conflict dialog
 - Cross-platform: Android (Capacitor 6 + Capacitor SQLite) / Web (PWA, Dexie/IndexedDB)
 
 ### Development
