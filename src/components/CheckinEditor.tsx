@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useAppStore } from '@/state/useAppStore'
+import { useHabitActions } from '@/hooks/useHabit'
 import { Modal } from './Modal'
 import type { Checkin, CheckStatus } from '@/db/types'
 
@@ -15,7 +15,7 @@ interface Props {
 
 export function CheckinEditor({ open, onOpenChange, projectId, date, initial, unit }: Props) {
   const { t } = useTranslation()
-  const setCheckin = useAppStore(s => s.setCheckin)
+  const { setCheckin } = useHabitActions()
   const [status, setStatus] = useState<CheckStatus>(initial?.status ?? 'success')
   const [value, setValue] = useState<string>(initial?.value != null ? String(initial.value) : '')
   const [note, setNote] = useState<string>(initial?.note ?? '')

@@ -1,27 +1,27 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
-import { getSyncConfig, setSyncConfig, testConnection, makeRemotePath, cleanupDeletedProjects, uploadImportedProject } from '@/sync/fullSync'
-import type { WebDavConfig } from '@/sync/webdav'
-import { epochDayToDateStr, type ReadableProjectFile } from '@/sync/merge'
-import type { Checkin } from '@/db/types'
-import { DEFAULT_REMOTE_DIR, makeProjectId, PROJECT_COLORS } from '@/db/schema'
-import { getRepo } from '@/db'
+import { loadConfig, saveConfig, testConnection, type WebDavConfig } from '@/sync/engine'
+import { epochDayToDateStr, DEFAULT_REMOTE_DIR, makeProjectId, PROJECT_COLORS } from '@/db/schema'
+import { useHabitActions } from '@/hooks/useHabit'
+import { useKysely, useSync } from 'sqlite-remote-sync/react'
 import { Download, Upload, Trash2, Sun, Moon, Monitor } from 'lucide-react'
 import { format } from 'date-fns'
+import { clearAll } from '@/db'
 
 type ThemeMode = 'auto' | 'light' | 'dark'
 
-function applyTheme(mode: ThemeMode) {
-  const dark = mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  document.documentElement.classList.toggle('dark', dark)
-  try { localStorage.setItem('theme', mode) } catch { /* noop */ }
+function epochDayToDateStrSafe(epochDay: number): string {
+  try { return epochDayToDateStr(epochDay) } catch { return '' }
 }
 
 export function Settings() {
   const { t } = useTranslation()
-  const sync = useAppStore(s => s.sync)
-  const triggerSync = useAppStore(s => s.triggerSync)
+  const sync = useSync()
+  const { addProject, setCheckin } = useHabitActions()
+  const db = useKysely()
+  const configured = useAppStore(s => s.configured)
+  const reconfigureEngine = useAppStore(s => s.reconfigureEngine)
 
   const [cfg, setCfg] = useState<WebDavConfig>({ url: '', username: '', password: '', remoteDir: DEFAULT_REMOTE_DIR })
   const [testing, setTesting] = useState(false)
@@ -29,18 +29,22 @@ export function Settings() {
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [theme, setTheme] = useState<ThemeMode>('auto')
   const [importing, setImporting] = useState<{ current: number; total: number } | null>(null)
-  const [cleaning, setCleaning] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    void (async () => {
-      const c = getSyncConfig()
-      if (c) setCfg(c)
-    })()
+    const c = loadConfig()
+    if (c) setCfg(c)
     try {
       const stored = localStorage.getItem('theme') as ThemeMode | null
       if (stored === 'light' || stored === 'dark' || stored === 'auto') setTheme(stored)
     } catch { /* noop */ }
   }, [])
+
+  function applyTheme(mode: ThemeMode) {
+    const dark = mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    document.documentElement.classList.toggle('dark', dark)
+    try { localStorage.setItem('theme', mode) } catch { /* noop */ }
+  }
 
   function setThemeMode(m: ThemeMode) {
     setTheme(m)
@@ -48,8 +52,9 @@ export function Settings() {
   }
 
   async function saveCfg() {
-    setSyncConfig(cfg)
+    saveConfig(cfg)
     setSavedAt(Date.now())
+    await reconfigureEngine()
   }
 
   async function handleTest() {
@@ -61,19 +66,29 @@ export function Settings() {
   }
 
   async function handleExport() {
-    const repo = await getRepo()
-    const projects = await repo.listProjects(true)
-    const data: ReadableProjectFile[] = []
-    for (const p of projects) {
-      const cs = await repo.getCheckins(p.id)
-      const { remoteEtag: _, remotePath: _rp, ...project } = p
-      data.push({
+    const rows = await db.selectFrom('projects').selectAll().execute()
+    const out = []
+    for (const p of rows) {
+      const cs = await db.selectFrom('checkins').selectAll().where('project_id', '=', p.id).orderBy('date', 'asc').execute()
+      out.push({
         version: 1,
-        project,
-        checkins: cs.map(c => ({ date: c.date, status: c.status, value: c.value, note: c.note, updatedAt: c.updatedAt })),
+        project: {
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          unit: p.unit,
+          emoji: p.emoji,
+          color: p.color,
+          sort: p.sort,
+          createdAt: p.created_at,
+          updatedAt: p.updated_at,
+          deleted: p.deleted,
+          archived: p.archived,
+        },
+        checkins: cs.map(c => ({ date: c.date, status: c.status, value: c.value, note: c.note, updatedAt: c.updated_at })),
       })
     }
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -94,6 +109,45 @@ export function Settings() {
     }
   }
 
+  async function importMhabit(habits: unknown[]) {
+    const now = Date.now()
+    const total = habits.filter(h => new Set(Object.keys((h as Record<string, unknown>))).has('name')).length
+    setImporting({ current: 0, total })
+    let processed = 0
+    for (const h of habits) {
+      const habit = h as Record<string, unknown>
+      const name = String(habit.name ?? '')
+      if (!name) continue
+      if (((habit.status as number) ?? 1) !== 1) continue
+      const id = makeProjectId()
+      const colorIdx = Math.min(Math.max(((habit.color as number) ?? 1) - 1, 0), PROJECT_COLORS.length - 1)
+      await addProject({
+        name,
+        description: (habit.desc as string) ?? '',
+        unit: (habit.daily_goal_unit as string) || null,
+        emoji: '📌',
+        color: PROJECT_COLORS[colorIdx],
+      })
+      const records = (habit.records as unknown[]) ?? []
+      if (records.length > 0) {
+        for (const r of records) {
+          const rec = r as Record<string, unknown>
+          const reason = (rec.reason as string) ?? ''
+          const note = (rec.note as string) ?? ''
+          const combinedNote = reason && note ? `${reason} | ${note}` : (reason || note || null)
+          const date = epochDayToDateStrSafe((rec.record_date as number) ?? 0)
+          if (!date) continue
+          const val = (rec.record_value as number | null) ?? null
+          await setCheckin(id, date, val === 1 ? 'success' : val === 0 ? 'fail' : null, val === 1 ? 1 : null, combinedNote)
+        }
+      }
+      processed++
+      setImporting({ current: processed, total })
+    }
+    setImporting(null)
+    alert(t('settings.importSuccess'))
+  }
+
   async function handleImport(file: File) {
     try {
       const text = await file.text()
@@ -102,37 +156,73 @@ export function Settings() {
         alert(t('settings.invalidFormat'))
         return
       }
-      const repo = await getRepo()
-      const total = raw.filter((item: any) => item.project?.id).length
-      setImporting({ current: 0, total })
+      const items = raw.filter((item: any) => item.project?.id)
+      setImporting({ current: 0, total: items.length })
       let processed = 0
-      for (const item of raw) {
-        if (!item.project?.id) continue
+      for (const item of items as Array<{ project: any; checkins?: any[] }>) {
         const now = Date.now()
-        const { remoteEtag: _re, remotePath: _rp, ...proj } = item.project
-        const remotePath = makeRemotePath(item.project.id)
-        const project = { ...proj, updatedAt: now, remoteEtag: null, remotePath }
-        await repo.upsertProject(project)
-        const checkins: Checkin[] = []
+        const pid = String(item.project.id)
+        await db.insertInto('projects').values({
+          id: pid,
+          name: String(item.project.name ?? ''),
+          description: String(item.project.description ?? ''),
+          unit: item.project.unit ?? null,
+          emoji: item.project.emoji ?? '📌',
+          color: item.project.color ?? PROJECT_COLORS[0],
+          sort: Number(item.project.sort ?? 0),
+          created_at: Number(item.project.createdAt ?? now),
+          updated_at: now,
+          deleted: Number(item.project.deleted ?? 0) ? 1 : 0,
+          archived: Number(item.project.archived ?? 0) ? 1 : 0,
+        })
+          .onConflict((oc) => oc.column('id').doUpdateSet({
+            name: String(item.project.name ?? ''),
+            description: String(item.project.description ?? ''),
+            unit: item.project.unit ?? null,
+            emoji: item.project.emoji ?? '📌',
+            color: item.project.color ?? PROJECT_COLORS[0],
+            sort: Number(item.project.sort ?? 0),
+            updated_at: now,
+            deleted: Number(item.project.deleted ?? 0) ? 1 : 0,
+            archived: Number(item.project.archived ?? 0) ? 1 : 0,
+          }))
+          .execute()
         for (const c of item.checkins ?? []) {
           if ('date' in c) {
-            checkins.push({ projectId: item.project.id, date: c.date, status: c.status, value: c.value, note: c.note, updatedAt: now })
+            await db.insertInto('checkins').values({
+              project_id: pid,
+              date: String(c.date),
+              status: String(c.status ?? 'success'),
+              value: c.value ?? null,
+              note: c.note ?? null,
+              updated_at: now,
+            }).onConflict((oc) => oc.columns(['project_id', 'date']).doUpdateSet({
+              status: String(c.status ?? 'success'),
+              value: c.value ?? null,
+              note: c.note ?? null,
+              updated_at: now,
+            })).execute()
           } else if (typeof c.d === 'number') {
-            const { compactToCheckin } = await import('@/sync/merge')
-            const ck = compactToCheckin(item.project.id, c)
-            checkins.push({ ...ck, updatedAt: now })
-          } else {
-            checkins.push({ projectId: item.project.id, date: c.d, status: c.s, value: c.v, note: c.n, updatedAt: now })
+            const date = epochDayToDateStrSafe(c.d)
+            if (!date) continue
+            await db.insertInto('checkins').values({
+              project_id: pid,
+              date,
+              status: c.s === 1 ? 'success' : 'fail',
+              value: c.v ?? null,
+              note: c.n ?? null,
+              updated_at: now,
+            }).onConflict((oc) => oc.columns(['project_id', 'date']).doUpdateSet({
+              status: c.s === 1 ? 'success' : 'fail',
+              value: c.v ?? null,
+              note: c.n ?? null,
+              updated_at: now,
+            })).execute()
           }
         }
-        if (checkins.length > 0) await repo.bulkUpsertCheckins(checkins)
-        const etag = await uploadImportedProject(project, checkins)
-        if (etag) await repo.upsertProject({ ...project, remoteEtag: etag })
         processed++
-        setImporting({ current: processed, total })
+        setImporting({ current: processed, total: items.length })
       }
-      const projects = await repo.listProjects()
-      useAppStore.setState({ projects })
       setImporting(null)
       alert(t('settings.importSuccess'))
     } catch (e) {
@@ -143,87 +233,9 @@ export function Settings() {
 
   async function handleClear() {
     if (!confirm(t('settings.clearConfirm'))) return
-    const repo = await getRepo()
-    await repo.clearDatabase()
-    useAppStore.setState({ projects: [], conflicts: {} })
-  }
-
-  async function handleCleanDeleted() {
-    if (!confirm(t('settings.cleanDeletedConfirm'))) return
-    setCleaning(true)
-    try {
-      const result = await cleanupDeletedProjects()
-      if (result === null) {
-        alert(t('settings.noSyncConfig'))
-      } else {
-        alert(t('settings.cleanDeletedDone', { count: result.cleaned }))
-      }
-    } catch (e) {
-      alert(t('settings.cleanDeletedFailed', { msg: e instanceof Error ? e.message : String(e) }))
-    } finally {
-      setCleaning(false)
-    }
-  }
-
-  async function importMhabit(habits: unknown[]) {
-    const repo = await getRepo()
-    const now = Date.now()
-    const total = habits.filter(h => { const habit = h as Record<string, unknown>; return String(habit.name ?? '') !== '' }).length
-    setImporting({ current: 0, total })
-    let processed = 0
-    for (const h of habits) {
-      const habit = h as Record<string, unknown>
-      const name = String(habit.name ?? '')
-      if (!name) continue
-      const id = makeProjectId()
-      const colorIdx = Math.min(Math.max(((habit.color as number) ?? 1) - 1, 0), PROJECT_COLORS.length - 1)
-//  忽略非进行中项目      
-      if (((habit.status as number) ?? 1) !== 1) continue
-      const project = {
-        id,
-        name,
-        description: habit.desc as string,
-        unit: (habit.daily_goal_unit as string) || null,
-        emoji: '📌',
-        color: PROJECT_COLORS[colorIdx],
-        sort: 0,
-        archived: 0 as const,
-        createdAt: ((habit.create_t as number) ?? Math.floor(now / 1000)) * 1000,
-        updatedAt: now,
-        remoteEtag: null,
-        remotePath: makeRemotePath(id, DEFAULT_REMOTE_DIR),
-        deleted: (((habit.status as number) ?? 1) === 1 ? 0 : 1) as 0 | 1,
-      }
-      await repo.upsertProject(project)
-      const records = (habit.records as unknown[]) ?? []
-      const checkins: Checkin[] = []
-      if (records.length > 0) {
-        for (const r of records) {
-          const rec = r as Record<string, unknown>
-          const recordDate = (rec.record_date as number) ?? 0
-          const reason = (rec.reason as string) ?? ''
-          const note = (rec.note as string) ?? ''
-          const combinedNote = reason && note ? `${reason} | ${note}` : (reason || note || null)
-          checkins.push({
-            projectId: id,
-            date: epochDayToDateStr(recordDate),
-            status: ((rec.record_value as number) ?? 1) === 1 ? 'success' : 'fail',
-            value: (rec.record_value as number | null) ?? null,
-            note: combinedNote,
-            updatedAt: now,
-          })
-        }
-        await repo.bulkUpsertCheckins(checkins)
-      }
-      const etag = await uploadImportedProject(project, checkins)
-      if (etag) await repo.upsertProject({ ...project, remoteEtag: etag })
-      processed++
-      setImporting({ current: processed, total })
-    }
-    const projects = await repo.listProjects()
-    useAppStore.setState({ projects })
-    setImporting(null)
-    alert(t('settings.importSuccess'))
+    await clearAll()
+    useAppStore.setState({ conflicts: [] })
+    location.reload()
   }
 
   return (
@@ -241,22 +253,16 @@ export function Settings() {
           <button className="btn-outline" onClick={handleTest} disabled={testing || !cfg.url}>
             {testing ? t('settings.testing') : t('settings.testConnection')}
           </button>
-          <button className="btn-primary" onClick={saveCfg} disabled={!cfg.url}>{t('settings.save')}</button>
+          <button className="btn-primary" onClick={saveCfg} disabled={busy || !cfg.url}>{t('settings.save')}</button>
           <div className="flex-1" />
-          <button className="btn-ghost" onClick={() => void triggerSync()}>{t('settings.syncNow')}</button>
+          <button className="btn-ghost" onClick={() => void sync.sync()}>{t('settings.syncNow')}</button>
         </div>
         {testResult && (
           <div className={`text-xs font-medium ${testResult.ok ? 'text-brand-400' : 'text-rose-400'}`}>{testResult.message}</div>
         )}
         {savedAt && <div className="text-xs text-slate-400">{t('settings.savedAt', { time: format(new Date(savedAt), 'HH:mm:ss') })}</div>}
         <div className="text-xs text-slate-400 pt-2 border-t border-slate-700/50">
-          {t('settings.status')}{sync.status} {sync.at && `· ${format(new Date(sync.at), 'MM-dd HH:mm')}`}
-          {sync.error && <div className="text-rose-400 mt-1">{sync.error}</div>}
-        </div>
-        <div className="pt-1">
-          <button className="btn-outline text-xs" onClick={handleCleanDeleted} disabled={cleaning}>
-            {cleaning ? '…' : <Trash2 size={14} />} {t('settings.cleanDeleted')}
-          </button>
+          {t('settings.status')}{configured ? t('sync.syncedShort') : t('sync.idle')}{sync.error ? ` · ${String(sync.error)}` : ''}
         </div>
       </div>
 

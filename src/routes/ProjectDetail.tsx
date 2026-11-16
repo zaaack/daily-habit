@@ -8,9 +8,8 @@ import {
     Settings as SettingsIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useAppStore } from "@/state/useAppStore";
+import { useProjects, useCheckins, useHabitActions } from "@/hooks/useHabit";
 import { todayStr } from "@/db/schema";
-import type { Checkin } from "@/db/types";
 import { StatusCell } from "@/components/StatusCell";
 import { ProjectEditor } from "@/components/ProjectEditor";
 import { MonthlyStatsChart } from "@/components/MonthlyStatsChart";
@@ -76,14 +75,13 @@ export function ProjectDetail() {
     const { t } = useTranslation();
     const { id = "" } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const projects = useAppStore((s) => s.projects);
-    const cycle = useAppStore((s) => s.cycleCheckin);
-    const checkinVersion = useAppStore((s) => s.checkinVersion);
+    const { projects } = useProjects();
+    const { cycleCheckin } = useHabitActions();
     const project = useMemo(
         () => projects.find((p) => p.id === id),
         [projects, id],
     );
-    const [checkins, setCheckins] = useState<Checkin[]>([]);
+    const { checkins } = useCheckins(id);
     const [editorOpen, setEditorOpen] = useState(false);
     const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -185,18 +183,6 @@ export function ProjectDetail() {
     const byDate = new Map(checkins.map((c) => [c.date, c]));
     const [ty, tm] = today.split("-").map(Number);
 
-    useEffect(() => {
-        let alive = true;
-        const load = async () => {
-            const { getRepo } = await import("@/db");
-            const repo = await getRepo();
-            const all = await repo.getCheckins(id);
-            if (alive) setCheckins(all);
-        };
-        void load();
-        return () => { alive = false; };
-    }, [id, checkinVersion]);
-
     if (!project) {
         return (
             <div className="card text-center text-slate-400 py-12">
@@ -241,10 +227,9 @@ export function ProjectDetail() {
                                         checkin={c}
                                         unit={project.unit}
                                         color={project.color}
-                                        refreshKey={checkinVersion}
                                         disabled={d > today}
                                         onCycle={() =>
-                                            void cycle(project.id, d)
+                                            void cycleCheckin(project.id, d)
                                         }
                                     />
                                 </div>

@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useAppStore } from '@/state/useAppStore'
+import { useProjects, useAllCheckins } from '@/hooks/useHabit'
 import { CheckinEditor } from '@/components/CheckinEditor'
 import type { Checkin, CheckStatus } from '@/db/types'
 import { cn } from '@/lib/cn'
@@ -12,34 +12,19 @@ const PAGE_SIZE = 30
 
 export function History() {
   const { t } = useTranslation()
-  const projects = useAppStore(s => s.projects)
-  const checkinVersion = useAppStore(s => s.checkinVersion)
+  const { projects } = useProjects()
+  const { checkins: allCheckins } = useAllCheckins()
   const [params, setParams] = useSearchParams()
   const filterProject = params.get('project') ?? ''
   const [statusFilter, setStatusFilter] = useState<'all' | CheckStatus>('all')
   const [keyword, setKeyword] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
-  const [allCheckins, setAllCheckins] = useState<Checkin[]>([])
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const [editor, setEditor] = useState<{ open: boolean; c?: Checkin }>({ open: false })
 
-  useEffect(() => {
-    let alive = true
-    const load = async () => {
-      const { getRepo } = await import('@/db')
-      const repo = await getRepo()
-      const out: Checkin[] = []
-      for (const p of projects) {
-        const all = await repo.getCheckins(p.id)
-        for (const c of all) out.push({ ...c, projectId: p.id })
-      }
-      if (alive) setAllCheckins(out.sort((a, b) => b.date.localeCompare(a.date)))
-    }
-    void load()
-    return () => { alive = false }
-  }, [projects, checkinVersion])
+  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [filterProject, statusFilter, dateFrom, dateTo, keyword])
 
   const projectById = useMemo(() => new Map(projects.map(p => [p.id, p])), [projects])
 
@@ -57,8 +42,6 @@ export function History() {
 
   const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount])
   const hasMore = visibleCount < filtered.length
-
-  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [filterProject, statusFilter, dateFrom, dateTo, keyword])
 
   const loadMore = useCallback(() => {
     setVisibleCount(n => n + PAGE_SIZE)

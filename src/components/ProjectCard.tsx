@@ -1,11 +1,9 @@
-import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { ChevronRight, GripVertical } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useAppStore } from "@/state/useAppStore";
-import { getRepo } from "@/db";
+import { useCheckins, useHabitActions } from "@/hooks/useHabit";
 import { StatusCell } from "./StatusCell";
-import type { Project, Checkin } from "@/db/types";
+import type { Project } from "@/db/types";
 import { todayStr } from "@/db/schema";
 import { cn } from "@/lib/cn";
 
@@ -19,35 +17,11 @@ export function ProjectCard({
     sorting?: boolean;
 }) {
     const { t } = useTranslation();
-    const cycle = useAppStore((s) => s.cycleCheckin);
-    const syncStatus = useAppStore((s) => s.sync.status);
-    const syncAt = useAppStore((s) => s.sync.at);
-    const [checkins, setCheckins] = useState<Checkin[]>([]);
-
-    const checkinVersion = useAppStore((s) => s.checkinVersion);
-
-    // Load checkins on mount, date range change, or sync completion
-    useEffect(() => {
-        let alive = true;
-        const load = async () => {
-            const repo = await getRepo();
-            const start = dates[0];
-            const end = dates[dates.length - 1];
-            const range = start && end ? { from: start, to: end } : undefined;
-            const data = await repo.getCheckins(project.id, range);
-            if (alive) setCheckins(data);
-        };
-        void load();
-        return () => {
-            alive = false;
-        };
-    }, [
+    const { cycleCheckin } = useHabitActions();
+    const { checkins } = useCheckins(
         project.id,
-        dates[0],
-        dates[dates.length - 1],
-        syncStatus === "ok" ? syncAt : null,
-        checkinVersion,
-    ]);
+        dates.length > 1 ? { from: dates[0], to: dates[dates.length - 1] } : undefined,
+    );
 
     const byDate = new Map(checkins.map((c) => [c.date, c]));
     const today = todayStr();
@@ -138,7 +112,7 @@ export function ProjectCard({
                                 color={project.color}
                                 compact
                                 disabled={isFuture}
-                                onCycle={() => void cycle(project.id, d)}
+                                onCycle={() => void cycleCheckin(project.id, d)}
                             />
                         </div>
                     );

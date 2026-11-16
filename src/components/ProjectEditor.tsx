@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useAppStore } from '@/state/useAppStore'
+import { useHabitActions } from '@/hooks/useHabit'
+import { useProjects } from '@/hooks/useHabit'
 import { PROJECT_COLORS, PROJECT_EMOJIS } from '@/db/schema'
 import { Modal } from './Modal'
 import { cn } from '@/lib/cn'
@@ -21,14 +22,10 @@ interface Props {
 
 export function ProjectEditor({ open, onOpenChange, initial, onDelete }: Props) {
   const { t } = useTranslation()
-  const addProject = useAppStore(s => s.addProject)
-  const updateProject = useAppStore(s => s.updateProject)
-  const deleteProject = useAppStore(s => s.deleteProject)
-  const restoreProject = useAppStore(s => s.restoreProject)
-  const archiveProject = useAppStore(s => s.archiveProject)
-  const unarchiveProject = useAppStore(s => s.unarchiveProject)
+  const { addProject, updateProject, deleteProject, restoreProject, archiveProject, unarchiveProject } = useHabitActions()
+  const { projects } = useProjects()
 
-  const currentProject = initial?.id ? useAppStore(s => s.projects.find(p => p.id === initial.id)) : undefined
+  const currentProject = initial?.id ? projects.find(p => p.id === initial.id) : undefined
 
   const [name, setName] = useState(initial?.name ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')

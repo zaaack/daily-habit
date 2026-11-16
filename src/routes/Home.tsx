@@ -5,6 +5,7 @@ import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type D
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useAppStore } from '@/state/useAppStore'
+import { useProjects, useHabitActions } from '@/hooks/useHabit'
 import { ProjectCard } from '@/components/ProjectCard'
 import { ProjectEditor } from '@/components/ProjectEditor'
 import { Modal } from '@/components/Modal'
@@ -30,8 +31,8 @@ function SortableProjectCard({ project, dates }: { project: Project; dates: stri
 
 export function Home() {
   const { t } = useTranslation()
-  const allProjects = useAppStore(s => s.projects)
-  const reorderProjects = useAppStore(s => s.reorderProjects)
+  const { projects } = useProjects()
+  const { reorderProjects } = useHabitActions()
   const filter = useAppStore(s => s.filterState)
   const setFilterState = useAppStore(s => s.setFilterState)
   const sorting = useAppStore(s => s.sortMode)
@@ -39,11 +40,11 @@ export function Home() {
   const [open, setOpen] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
 
-  const projects = useMemo(() => allProjects.filter(p => {
+  const filteredProjects = useMemo(() => projects.filter(p => {
     if (p.deleted) return filter.deleted
     if (p.archived) return filter.archived
     return filter.normal
-  }), [allProjects, filter])
+  }), [projects, filter])
 
   const today = todayStr()
   const todayDow = new Date(today + 'T00:00:00').getDay()
@@ -55,7 +56,7 @@ export function Home() {
   const newest = dates[dates.length - 1]
   const rangeLabel = `${oldest.slice(5)} – ${newest.slice(5)}`
 
-  const [localProjects, setLocalProjects] = useState(projects)
+  const [localProjects, setLocalProjects] = useState(filteredProjects)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -64,10 +65,10 @@ export function Home() {
   )
 
   useEffect(() => {
-    if (sorting) setLocalProjects(projects)
-  }, [sorting, projects])
+    if (sorting) setLocalProjects(filteredProjects)
+  }, [sorting, filteredProjects])
 
-  const displayProjects = sorting ? localProjects : projects
+  const displayProjects = sorting ? localProjects : filteredProjects
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
@@ -83,7 +84,7 @@ export function Home() {
 
   const doneSorting = () => {
     setSortMode(false)
-    reorderProjects(localProjects.map(p => p.id))
+    void reorderProjects(localProjects.map(p => p.id))
   }
 
   return (
@@ -129,7 +130,7 @@ export function Home() {
         </div>
       </div>
 
-      {projects.length === 0 ? (
+      {filteredProjects.length === 0 ? (
         <div className="card text-center text-slate-400 py-12">
           <div className="text-3xl mb-3">📝</div>
           <div className="text-sm font-medium text-slate-300">{t('home.empty')}</div>

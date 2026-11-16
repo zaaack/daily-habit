@@ -2,14 +2,14 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Home as HomeIcon, ListChecks, Settings as SettingsIcon, RefreshCw, ArrowUpDown, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/state/useAppStore'
+import { useSyncEvent, useSync } from 'sqlite-remote-sync/react'
 import { cn } from '@/lib/cn'
 import { formatDistanceToNow } from 'date-fns'
 import { getDateFnsLocale } from '@/i18n/locale'
 
 export function Layout() {
   const { t } = useTranslation()
-  const sync = useAppStore(s => s.sync)
-  const triggerSync = useAppStore(s => s.triggerSync)
+  const sync = useSync()
   const sortMode = useAppStore(s => s.sortMode)
   const toggleSortMode = useAppStore(s => s.toggleSortMode)
   const loc = useLocation()
@@ -24,14 +24,14 @@ export function Layout() {
             <span className="text-slate-50">Daily Habit</span>
           </Link>
           <div className="flex-1" />
-          <SyncBadge />
+          <SyncBadge isSyncing={sync.isSyncing} />
           <button
             className="btn-ghost p-2 rounded-xl"
-            onClick={() => void triggerSync()}
+            onClick={() => void sync.sync()}
             title={t('layout.syncNow')}
             aria-label={t('layout.syncNow')}
           >
-            <RefreshCw size={16} className={sync.status === 'syncing' ? 'animate-spin' : ''} />
+            <RefreshCw size={16} className={sync.isSyncing ? 'animate-spin' : ''} />
           </button>
           <button
             className="btn-ghost p-2 rounded-xl"
@@ -77,17 +77,22 @@ function TabLink({ to, icon, label }: { to: string; icon: React.ReactNode; label
   )
 }
 
-function SyncBadge() {
+function SyncBadge({ isSyncing }: { isSyncing: boolean }) {
   const { t, i18n } = useTranslation()
-  const sync = useAppStore(s => s.sync)
-  let label = t('sync.idle')
+  const engine = useAppStore(s => s.engine)
+  const configured = useAppStore(s => s.configured)
+  const ev = useSyncEvent()
+
+  let label: string
   let color = 'text-slate-400'
-  if (sync.status === 'syncing') { label = t('sync.syncing'); color = 'text-amber-400' }
-  else if (sync.status === 'ok' && sync.at) {
-    try { label = t('sync.synced', { relative: formatDistanceToNow(new Date(sync.at), { addSuffix: true, locale: getDateFnsLocale(i18n.language) }) }) }
-    catch { label = t('sync.syncedShort') }
-    color = 'text-slate-400'
-  } else if (sync.status === 'error') { label = t('sync.error'); color = 'text-rose-400' }
-  else if (sync.status === 'conflict') { label = t('sync.conflict'); color = 'text-amber-300' }
+
+  if (ev?.type === 'error') { label = t('sync.error'); color = 'text-rose-400' }
+  else if (ev?.type === 'conflict') { label = t('sync.conflict'); color = 'text-amber-300' }
+  else if (isSyncing) { label = t('sync.syncing'); color = 'text-amber-400' }
+  else if (ev?.type === 'pull') { label = t('sync.synced', { relative: formatDistanceToNow(new Date(), { addSuffix: true, locale: getDateFnsLocale(i18n.language) }) }); color = 'text-slate-400' }
+  else if (!configured) { label = t('sync.idle') }
+  else if (engine) { label = t('sync.syncedShort') }
+  else { label = t('sync.idle') }
+
   return <span className={cn('text-xs font-medium', color)}>{label}</span>
 }

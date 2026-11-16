@@ -14,11 +14,6 @@ export const PROJECT_EMOJIS = [
 
 export const DEFAULT_REMOTE_DIR = '/daily-habit'
 
-export function makeRemotePath(id: string, dir: string = DEFAULT_REMOTE_DIR): string {
-  const d = dir.endsWith('/') ? dir.slice(0, -1) : dir
-  return `${d}/${id}.json`
-}
-
 export function makeProjectId(): string {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 16)
 }
@@ -44,6 +39,11 @@ export function shiftDateStr(s: string, days: number): string {
 export function quarterOfDate(date: string): string {
   const [year, month] = date.split('-').map(Number)
   return `${year}-Q${Math.floor((month - 1) / 3) + 1}`
+}
+
+export function epochDayToDateStr(epochDay: number): string {
+  const d = new Date(epochDay * 86400000)
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
 export function monthDays(year: number, month: number): string[] {

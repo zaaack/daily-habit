@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useAppStore } from '@/state/useAppStore'
-import { getRepo } from '@/db'
+import { getDB } from '@/db'
 import { platform } from '@/lib/platform'
+import { getSiteId } from '@/sync/engine'
 
 interface MemInfo {
   used: string
@@ -52,15 +53,13 @@ export function DebugPanel() {
     const refresh = async () => {
       setMem(readMem())
       try {
-        const repo = await getRepo()
-        const projects = await repo.listProjects(true)
-        setDbProjects(projects.length)
-        let count = 0
-        for (const p of projects) {
-          const cs = await repo.getCheckins(p.id)
-          count += cs.length
-        }
-        setCheckinCount(count)
+        const db = getDB()
+        const [{ count: pc }, { count: cc }] = await Promise.all([
+          db.selectFrom('projects').select(db.fn.countAll().as('count')).executeTakeFirstOrThrow(),
+          db.selectFrom('checkins').select(db.fn.countAll().as('count')).executeTakeFirstOrThrow(),
+        ])
+        setDbProjects(Number(pc))
+        setCheckinCount(Number(cc))
       } catch { /* ignore */ }
     }
     void refresh()
@@ -81,22 +80,27 @@ export function DebugPanel() {
           <span>{platform}</span>
         </div>
         <div className="flex justify-between">
+          <span className="text-slate-400">SiteId</span>
+          <span className="break-all text-right max-w-[140px]">{getSiteId()}</span>
+        </div>
+        <div className="flex justify-between">
           <span className="text-slate-400">Projects</span>
-          <span>{state.projects.length} / {dbProjects ?? '?'}</span>
+          <span>{dbProjects ?? '?'}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-slate-400">Checkins</span>
           <span>{checkinCount ?? '…'}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-slate-400">Sync</span>
-          <span className={state.sync.status === 'error' ? 'text-rose-400' : 'text-emerald-400'}>
-            {state.sync.status}
+          <span className="text-slate-400">Configured</span>
+          <span className={state.configured ? 'text-emerald-400' : 'text-slate-400'}>
+            {state.configured ? 'yes' : 'no'}
           </span>
         </div>
-        {state.sync.error && (
-          <div className="text-rose-400 break-all">Error: {state.sync.error}</div>
-        )}
+        <div className="flex justify-between">
+          <span className="text-slate-400">Conflicts</span>
+          <span>{state.conflicts.length}</span>
+        </div>
         <hr className="border-slate-700/50 my-2" />
         {mem ? (
           <>

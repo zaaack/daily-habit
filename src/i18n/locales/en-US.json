@@ -138,7 +138,10 @@
   },
   "conflict": {
     "title": "Sync conflict",
-    "count": "{{count}} differences",
+    "notice": "Some entries were changed on multiple devices at the same time. The most recently edited value was kept automatically.",
+    "count": "{{count}} entries",
+    "project": "Projects",
+    "checkin": "Check-ins",
     "local": "Local",
     "remote": "Remote",
     "later": "Later",
@@ -156,6 +159,7 @@
   },
   "common": {
     "dow": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-    "done": "Done"
+    "done": "Done",
+    "ok": "OK"
   }
 }

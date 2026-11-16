@@ -8,9 +8,6 @@ const base = isDesktop ? '/' : (process.env.VITE_BASE_URL || '/daily-habit/')
 async function createPlugins(): Promise<PluginOption[]> {
   const plugins: PluginOption[] = [react()]
 
-const { default: sqlocalVitePlugin } = await import('sqlocal/vite')
-plugins.push(sqlocalVitePlugin({ coi: true }))
-    
   if (!isDesktop) {
     const { VitePWA } = await import('vite-plugin-pwa')
     plugins.push(
@@ -47,6 +44,9 @@ export default defineConfig({
   build: {
     outDir: 'docs',
   },
+  worker: {
+    format: 'es',
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -54,10 +54,6 @@ export default defineConfig({
   },
   server: {
         port: 5173, strictPort: isDesktop,
-        headers: {
-          'Cross-Origin-Embedder-Policy': 'require-corp',
-          'Cross-Origin-Opener-Policy': 'same-origin',
-        },
       },
   plugins: await createPlugins(),
 })
