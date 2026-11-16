@@ -26,9 +26,11 @@ class CapacitorCommunityConnection implements DatabaseConnection {
     throw new Error('Streaming is not supported.')
   }
 
+  // Mirror the engine adapter's READ_SQL: everything that yields rows must go
+  // through conn.query(); conn.run() throws "code 100: another row available"
+  // when a statement produces a result set (e.g. PRAGMA table_info).
   private isSelect(sql: string): boolean {
-    const upper = sql.trimStart().toUpperCase()
-    return upper.startsWith('SELECT') || upper.includes('RETURNING')
+    return /^\s*(select|pragma|with|values|explain)\b/i.test(sql)
   }
 }
 
