@@ -14,7 +14,10 @@ class CapacitorCommunityConnection implements DatabaseConnection {
       return { rows: (result.values ?? []) as R[] }
     }
 
-    const result = await this.conn.run(sql, values)
+    // transaction: false — Kysely owns begin/commit/rollback (via the driver) ;
+    // leaving the plugin default (true) makes native `run` begin another
+    // transaction when one is already open, throwing "Already in transaction".
+    const result = await this.conn.run(sql, values, false)
     return {
       numAffectedRows: result.changes?.changes !== undefined ? BigInt(result.changes.changes) : undefined,
       insertId: result.changes?.lastId !== undefined ? BigInt(result.changes.lastId) : undefined,
