@@ -1,4 +1,4 @@
-import { createSyncEngine, MemoryBackend, WebDavBackend } from 'sqlite-remote-sync'
+import { createSyncEngine, MemoryBackend, RemoteError, WebDavBackend } from 'sqlite-remote-sync'
 import type { SyncEngine, RemoteBackend, SyncEvent } from 'sqlite-remote-sync'
 import type { SqliteAdapter } from 'sqlite-remote-sync'
 import type { ConflictNotice } from '@/db'
@@ -74,10 +74,15 @@ async function makeBackend(cfg: WebDavConfig | null): Promise<RemoteBackend> {
 
 export async function testConnection(cfg: WebDavConfig): Promise<{ ok: boolean; message: string }> {
   try {
-    const backend = new WebDavBackend({ url: cfg.url })
+    const base = await resolveBaseUrl(cfg)
+    const backend = new WebDavBackend({ url: base, username: cfg.username, password: cfg.password })
     await backend.list('')
     return { ok: true, message: '连接成功' }
   } catch (e) {
+    const status = e instanceof RemoteError ? e.status : undefined
+    if (status === 401) return { ok: false, message: '认证失败 (401)：请检查用户名和密码' }
+    if (status === 403) return { ok: false, message: '无权限 (403)' }
+    if (status === 404) return { ok: true, message: '连接成功（远程目录不存在，将自动创建）' }
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }
 }
