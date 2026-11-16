@@ -20,6 +20,17 @@ export function normalizeDir(dir: string): string {
   return dir.startsWith('/') ? dir : `/${dir}`
 }
 
+/** Abort any WebDAV fetch that stalls (unreachable host / hung server). */
+const DAV_FETCH_TIMEOUT_MS = 8000
+function davFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), DAV_FETCH_TIMEOUT_MS)
+  const signal = init?.signal ? AbortSignal.any([init.signal, ctrl.signal]) : ctrl.signal
+  return globalThis
+    .fetch(input, { ...init, signal })
+    .finally(() => clearTimeout(timer))
+}
+
 export function loadConfig(): WebDavConfig | null {
   try {
     const v = JSON.parse(localStorage.getItem(CONFIG_KEY) || 'null') as WebDavConfig | null
@@ -50,6 +61,9 @@ let _engine: SyncEngine | null = null
 let _configured = false
 let _conflictCb: ((n: ConflictNotice) => void) | null = null
 let _seq = 0
+// In-flight (re)configuration. Concurrent `configureEngine` calls share one
+// promise so a second save never closes an engine the first save is using.
+let _configuring: Promise<SyncEngine> | null = null
 
 /** Resolve the WebDAV base URL (routes through the Wails proxy on desktop). */
 async function resolveBaseUrl(cfg: WebDavConfig): Promise<string> {
@@ -91,42 +105,48 @@ export async function testConnection(cfg: WebDavConfig): Promise<{ ok: boolean; 
  * (Re)create the sync engine. Outbox/cursors live inside the SQLite file, so a
  * fresh engine picks up pending local changes on the next sync.
  */
-export async function configureEngine(adapter: SqliteAdapter): Promise<SyncEngine> {
-  if (_engine) {
-    try { await _engine.close() } catch { /* ignore */ }
-    _engine = null
-  }
-
-  const cfg = loadConfig()
-  _configured = !!cfg
-  const engine = createSyncEngine({
-    db: adapter,
-    backend: await makeBackend(cfg),
-    appId: APP_ID,
-    siteId: getSiteId(),
-    tables: [
-      { name: 'projects', primaryKey: ['id'] },
-      { name: 'checkins', primaryKey: ['project_id', 'date'] },
-    ],
-    strategy: 'field',
-    compress: true,
-    retry: { attempts: 3, baseDelayMs: 200, maxDelayMs: 3000 },
-  })
-
-  engine.on((ev) => {
-    if (ev.type === 'conflict' && _conflictCb) {
-      _conflictCb({ seq: ++_seq, tbl: ev.tbl, pk: ev.pk, at: Date.now() })
+export function configureEngine(adapter: SqliteAdapter): Promise<SyncEngine> {
+  if (_configuring) return _configuring
+  _configuring = (async (): Promise<SyncEngine> => {
+    if (_engine) {
+      try { await _engine.close() } catch { /* ignore */ }
+      _engine = null
     }
+
+    const cfg = loadConfig()
+    _configured = !!cfg
+    const engine = createSyncEngine({
+      db: adapter,
+      backend: await makeBackend(cfg),
+      appId: APP_ID,
+      siteId: getSiteId(),
+      tables: [
+        { name: 'projects', primaryKey: ['id'] },
+        { name: 'checkins', primaryKey: ['project_id', 'date'] },
+      ],
+      strategy: 'field',
+      compress: true,
+      retry: { attempts: 3, baseDelayMs: 200, maxDelayMs: 3000 },
+    })
+
+    engine.on((ev) => {
+      if (ev.type === 'conflict' && _conflictCb) {
+        _conflictCb({ seq: ++_seq, tbl: ev.tbl, pk: ev.pk, at: Date.now() })
+      }
+    })
+
+    await engine.init()
+
+    // Auto-sync every 5 minutes (same cadence as the old app's interval).
+    if (_configured) engine.startAutoSync(5 * 60 * 1000)
+    else engine.stopAutoSync()
+
+    _engine = engine
+    return engine
+  })().finally(() => {
+    _configuring = null
   })
-
-  await engine.init()
-
-  // Auto-sync every 5 minutes (same cadence as the old app's interval).
-  if (_configured) engine.startAutoSync(5 * 60 * 1000)
-  else engine.stopAutoSync()
-
-  _engine = engine
-  return engine
+  return _configuring
 }
 
 export function getEngine(): SyncEngine | null {

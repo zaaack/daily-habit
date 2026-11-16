@@ -52,9 +52,15 @@ export function Settings() {
   }
 
   async function saveCfg() {
-    saveConfig(cfg)
-    setSavedAt(Date.now())
-    await reconfigureEngine()
+    if (busy) return
+    setBusy(true)
+    try {
+      saveConfig(cfg)
+      setSavedAt(Date.now())
+      await reconfigureEngine()
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function handleTest() {
