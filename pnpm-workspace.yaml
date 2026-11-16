@@ -4,3 +4,6 @@ allowBuilds:
   esbuild: true
   sharp: true
   workerd: false
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - sqlite-remote-sync
